@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About | Ethan Dsouza</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="profile">
+            <img src="assets/images/profile-placeholder.png" alt="Ethan Dsouza" class="profile-img" id="profile-img">
+            <div class="profile-name">Ethan Dsouza</div>
+            <div class="profile-bio">MEng EIE Student at Imperial College London. Passionate about Defence Tech,
+                Embedded Systems, and AI.</div>
+        </div>
+
+        <ul class="nav-links">
+            <li><a href="index.html">Blog</a></li>
+            <li><a href="about.html" class="active">About</a></li>
+        </ul>
+
+        <div class="social-links">
+            <a href="https://github.com" target="_blank"><i class="fab fa-github"></i></a>
+            <a href="https://linkedin.com" target="_blank"><i class="fab fa-linkedin"></i></a>
+            <a href="mailto:ethandes2021@gmail.com"><i class="fas fa-envelope"></i></a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <h1 class="page-title">About Me</h1>
+
+        <div class="about-section">
+            <p style="font-size: 1.1rem; margin-bottom: 20px;">
+                I am a penultimate-year Electronics and Information Engineering student at Imperial College London with
+                strong programming foundations and hands-on experience building software systems from embedded
+                controllers to cloud infrastructure. I am passionate about defence technology and collaborative
+                problem-solving.
+            </p>
+        </div>
+
+        <div class="about-section">
+            <h2>Education</h2>
+            <div style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 5px;">Imperial College London</h3>
+                <p style="color: #718096; font-style: italic;">MEng in Electronics and Information Engineering | 2023 -
+                    2027</p>
+                <ul>
+                    <li>Achieved a 2:1 in both Year 1 and Year 2 of studies</li>
+                    <li>Societies & Activities: Robotics Society, University Badminton 1st Team</li>
+                </ul>
+            </div>
+            <div>
+                <h3 style="margin-bottom: 5px;">Sir William Borlase’s Grammar School</h3>
+                <p style="color: #718096; font-style: italic;">2016 - 2023</p>
+                <ul>
+                    <li>A*A*AA in Mathematics, Chemistry, Physics, Further Mathematics</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="about-section">
+            <h2>Technical Skills</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                <div>
+                    <h3>Languages</h3>
+                    <p>Python, C++, C90, SystemVerilog</p>
+                </div>
+                <div>
+                    <h3>Databases</h3>
+                    <p>PostgreSQL, AWS RDS MySQL</p>
+                </div>
+                <div>
+                    <h3>Embedded</h3>
+                    <p>FPGA (Nios II), Motor control, Sensor interfacing</p>
+                </div>
+                <div>
+                    <h3>Systems</h3>
+                    <p>Distributed systems, Cloud (AWS EC2), Flask, IoT</p>
+                </div>
+                <div>
+                    <h3>ML Tools</h3>
+                    <p>TensorFlow, Supervised Learning</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="about-section">
+            <h2>Featured Projects</h2>
+
+            <h3>Custom RISC-V Processor Implementation</h3>
+            <p>Implemented a fully pipelined RISC-V processor in SystemVerilog, achieving a top 5 ranking. Designed the
+                5-stage pipeline architecture with Forwarding Units and Hazard Detection to maximize throughput.</p>
+
+            <h3>C90-to-RISC-V Compiler</h3>
+            <p>Built a C90 compiler targeting RISC-V assembly using C++, Flex, and YACC. Implemented the full
+                compilation pipeline from lexical analysis to optimized assembly generation.</p>
+
+            <h3>FPGA Online Multi-player Game</h3>
+            <p>Engineered a two-player online Space Invaders game using FPGA-based controllers and a Unity client,
+                synchronized via an AWS EC2 web server. Designed the distributed control loop for real-time performance.
+            </p>
+
+            <h3>Multi-Sensor Data Fusion Rover</h3>
+            <p>Designed a rover performing multi-domain signal detection (Infrared, Ultrasound, RF) and streaming fused
+                data to a remote application. Implemented the signal processing pipeline and low-bandwidth telemetry
+                protocol.</p>
+
+            <h3>Smart Grid Energy Optimization</h3>
+            <p>Developed an AWS backend for energy trading, optimizing costs by forecasting demand and managing
+                supercapacitor reserves. Implemented Price-Aware Resource Management algorithms in C++ with a
+                Python/Flask interface.</p>
+        </div>
+
+        <div class="about-section">
+            <h2>Experience</h2>
+            <ul>
+                <li><strong>Optiver Trading Academy (2025):</strong> 3-week course on market making and options trading.
+                </li>
+                <li><strong>Tata Consultancy Services (2025):</strong> Spring insight program focused on consultancy and
+                    AI.</li>
+                <li><strong>McDermott International (2022):</strong> Shadowed engineering disciplines in LNG process
+                    plant operations.</li>
+                <li><strong>Code Ninjas (2022):</strong> Tutored young kids in programming.</li>
+            </ul>
+        </div>
+
+    </main>
+
+    <script>
+        document.getElementById('profile-img').onerror = function () {
+            this.src = 'https://ui-avatars.com/api/?name=Ethan+Dsouza&background=random&size=200';
+        };
+    </script>
+</body>
+
+</html>

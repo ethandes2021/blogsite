@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optical Switching: The Secret Sauce of Massive Scale AI</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <a href="index.html" class="back-button">← Back to Blog</a>
+        <div class="article-header-row">
+            <div class="article-header-text">
+                <h1>Optical Switching: The Secret Sauce of Massive Scale AI</h1>
+            </div>
+            <img src="assets/images/optical-switching-banner.png" alt="Optical Switching Banner"
+                class="article-banner-side">
+        </div>
+
+        <p class="intro">
+            As AI models breach the trillion-parameter mark, the bottleneck isn't just compute—it's communication. While
+            NVIDIA dominates the GPU market, Google has quietly built a supercomputing advantage using a technology that
+            sounds like science fiction: <strong>Optical Circuit Switching (OCS)</strong>.
+        </p>
+
+        <p>
+            In this article, we'll explore how light-based switching works, how it powers Google's TPU v4 pods, and why
+            it might be the key to overcoming the "electrical wall" facing traditional GPU clusters.
+        </p>
+
+        <h2>The Electrical Bottleneck</h2>
+
+        <p>
+            Traditional data centers rely on electrical packet switches (like InfiniBand or Ethernet) to connect
+            thousands of GPUs. This works well, but it hits a wall at massive scales:
+        </p>
+
+        <ul>
+            <li><strong>Power:</strong> Converting optical signals (from fiber cables) to electrical signals (for the
+                switch) and back again consumes massive amounts of power.</li>
+            <li><strong>Latency:</strong> Electrical switches must buffer and process packets, adding latency.</li>
+            <li><strong>Rigidity:</strong> Once you wire up a cluster, changing the topology (e.g., from a 2D mesh to a
+                3D torus) requires physically moving cables—a logistical nightmare.</li>
+        </ul>
+
+        <h2>Enter Optical Circuit Switching (OCS)</h2>
+
+        <p>
+            Optical Circuit Switches don't convert light to electricity. Instead, they use tiny, microscopic mirrors
+            (MEMS) to physically reflect light beams from an input fiber to an output fiber.
+        </p>
+
+        <div class="highlight-box">
+            <strong>Key Concept:</strong> OCS is "bit-rate independent." It doesn't care if you're sending 10 Gbps or
+            800 Gbps. It just reflects the light. This makes it incredibly future-proof.
+        </div>
+
+        <p>
+            Imagine a room full of mirrors. By tilting them, you can instantly redirect a laser pointer to any target.
+            That's OCS.
+        </p>
+
+        <div class="animation-container">
+            <svg width="600" height="300" viewBox="0 0 600 300"
+                style="margin: 0 auto; display: block; background: white; border: 1px solid #e2e8f0; border-radius: 8px;">
+                <!-- Input Fibers -->
+                <text x="20" y="100" font-family="sans-serif" font-size="14">Input Fibers</text>
+                <rect x="50" y="120" width="20" height="60" fill="#cbd5e0" />
+
+                <!-- Output Fibers -->
+                <text x="500" y="100" font-family="sans-serif" font-size="14">Output Fibers</text>
+                <rect x="530" y="120" width="20" height="60" fill="#cbd5e0" />
+
+                <!-- MEMS Mirrors -->
+                <g id="mirrors">
+                    <rect x="250" y="100" width="100" height="100" fill="none" stroke="#2d3748"
+                        stroke-dasharray="5,5" />
+                    <text x="260" y="90" font-family="sans-serif" font-size="12" fill="#718096">MEMS Mirror Array</text>
+
+                    <!-- Mirror 1 -->
+                    <line x1="280" y1="130" x2="300" y2="150" stroke="#4a5568" stroke-width="3" />
+                    <!-- Mirror 2 -->
+                    <line x1="300" y1="150" x2="320" y2="170" stroke="#4a5568" stroke-width="3" />
+                </g>
+
+                <!-- Light Beams -->
+                <path d="M 70 130 L 290 140 L 530 130" stroke="#f56565" stroke-width="2" fill="none"
+                    stroke-dasharray="10,5">
+                    <animate attributeName="stroke-dashoffset" from="100" to="0" dur="2s" repeatCount="indefinite" />
+                </path>
+                <path d="M 70 170 L 310 160 L 530 170" stroke="#4299e1" stroke-width="2" fill="none"
+                    stroke-dasharray="10,5">
+                    <animate attributeName="stroke-dashoffset" from="100" to="0" dur="2s" repeatCount="indefinite" />
+                </path>
+
+                <text x="300" y="250" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#718096">Light
+                    is redirected by tilting mirrors</text>
+            </svg>
+            <p class="caption">Simplified OCS Diagram: Mirrors redirect light without electrical conversion.</p>
+        </div>
+
+        <h2>Google's TPU v4 Architecture</h2>
+
+        <p>
+            Google's TPU v4 pods use OCS to interconnect 4,096 chips. This architecture, known as "Project Apollo,"
+            allows them to:
+        </p>
+
+        <ol>
+            <li><strong>Dynamic Topology:</strong> They can reconfigure the network topology in milliseconds. If a job
+                needs a 3D torus, the mirrors tilt one way. If it needs a twisted torus, they tilt another.</li>
+            <li><strong>Fault Tolerance:</strong> If a TPU chip fails, the OCS simply routes around it. In a hard-wired
+                electrical cluster, a bad node can bring down the whole job.</li>
+            <li><strong>Cost & Power:</strong> OCS switches are cheaper and consume a fraction of the power of
+                equivalent electrical switches.</li>
+        </ol>
+
+        <h2>The NVIDIA Comparison</h2>
+
+        <p>
+            NVIDIA's SuperPODs rely on massive electrical switching fabrics (InfiniBand/NVLink). While incredibly high
+            bandwidth, they face challenges:
+        </p>
+
+        <div class="math-block">
+            <p><strong>NVIDIA Approach:</strong> High-power electrical switches + Transceivers at every hop.</p>
+            <p><strong>Google Approach:</strong> Passive optical switching + Direct optical links.</p>
+        </div>
+
+        <p>
+            As we move towards clusters with 100,000+ chips, the power consumption of the network alone becomes a
+            limiting factor. Optical switching offers a path to break through this "energy wall," enabling the next
+            generation of massive AI models.
+        </p>
+
+        <div class="footer">
+            <p>Published on November 29, 2025</p>
+        </div>
+    </div>
+</body>
+
+</html>

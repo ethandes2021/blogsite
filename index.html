@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ethan Dsouza | Blog</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="profile">
+            <img src="assets/images/ethan.jpeg" class="profile-img" id="profile-img">
+            <div class="profile-name">Ethan Dsouza</div>
+            <div class="profile-bio">MEng EIE Student at Imperial College London. Passionate about Defence Tech,
+                Embedded Systems, and AI.</div>
+        </div>
+
+        <ul class="nav-links">
+            <li><a href="index.html" class="active">Blog</a></li>
+            <li><a href="about.html">About</a></li>
+        </ul>
+
+        <div class="social-links">
+            <a href="https://github.com" target="_blank"><i class="fab fa-github"></i></a>
+            <a href="https://linkedin.com" target="_blank"><i class="fab fa-linkedin"></i></a>
+            <a href="mailto:ethandes2021@gmail.com"><i class="fas fa-envelope"></i></a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <h1 class="page-title">Latest Articles</h1>
+
+        <!-- Article 4: Optical Switching -->
+        <article class="post-card">
+            <img src="assets/images/optical-switching-banner.png" alt="Optical Switching" class="post-thumbnail">
+            <div class="post-content">
+                <div class="post-meta">November 2025 • AI Infrastructure</div>
+                <a href="optical-switching.html">
+                    <h2 class="post-title">Optical Switching: The Secret Sauce of Massive Scale AI</h2>
+                </a>
+                <p class="post-excerpt">
+                    Google's TPU v4 uses mirrors to switch light, overcoming the electrical bottlenecks of traditional
+                    GPU clusters. Discover the insane architecture behind massive scale processing.
+                </p>
+                <div class="post-tags">
+                    <span class="tag">Hardware</span>
+                    <span class="tag">Optics</span>
+                    <span class="tag">TPU</span>
+                </div>
+            </div>
+        </article>
+
+        <!-- Article 3: Analog AI -->
+        <article class="post-card">
+            <img src="assets/images/analog-banner.png" alt="Analog AI Chips" class="post-thumbnail">
+            <div class="post-content">
+                <div class="post-meta">November 2025 • Hardware AI</div>
+                <a href="analog-ai.html">
+                    <h2 class="post-title">The Renaissance of Analog AI Chips</h2>
+                </a>
+                <p class="post-excerpt">
+                    As AI models grow, digital energy demands are becoming unsustainable. Discover how Analog AI chips
+                    leverage physics to perform massive computations with a fraction of the power.
+                </p>
+                <div class="post-tags">
+                    <span class="tag">Hardware</span>
+                    <span class="tag">AI</span>
+                    <span class="tag">Future Tech</span>
+                </div>
+            </div>
+        </article>
+
+        <!-- Article 1: Backpropagation -->
+        <article class="post-card">
+            <img src="assets/images/backprop-banner.png" alt="Backpropagation" class="post-thumbnail">
+            <div class="post-content">
+                <div class="post-meta">October 2025 • Deep Learning</div>
+                <a href="backprop.html">
+                    <h2 class="post-title">A Visual Guide to Backpropagation</h2>
+                </a>
+                <p class="post-excerpt">
+                    Neural networks learn through a process called backpropagation. Explore this fundamental algorithm
+                    through interactive animations that reveal how neural networks adjust their weights to minimize
+                    error.
+                </p>
+                <div class="post-tags">
+                    <span class="tag">Deep Learning</span>
+                    <span class="tag">Math</span>
+                    <span class="tag">Visualization</span>
+                </div>
+            </div>
+        </article>
+
+        <!-- Article 2: Distance Measures -->
+        <article class="post-card">
+            <img src="assets/images/distance-banner.png" alt="Distance Measures" class="post-thumbnail">
+            <div class="post-content">
+                <div class="post-meta">October 2025 • Data Science</div>
+                <a href="distance.html">
+                    <h2 class="post-title">A Visual Guide to Distance Measures</h2>
+                </a>
+                <p class="post-excerpt">
+                    Distance measures are the foundation of many machine learning algorithms. From Euclidean to
+                    Mahalanobis, understand how we measure similarity and dissimilarity between data points.
+                </p>
+                <div class="post-tags">
+                    <span class="tag">Data Science</span>
+                    <span class="tag">Math</span>
+                    <span class="tag">Visualization</span>
+                </div>
+            </div>
+        </article>
+
+
+    </main>
+
+    <!-- Right Index Panel -->
+    <aside class="right-panel">
+        <div class="index-title">Article Index</div>
+
+        <div class="year-group">
+            <div class="year-label">2025</div>
+
+            <div class="month-group">
+                <div class="month-label">November</div>
+                <ul class="article-list">
+                    <li><a href="optical-switching.html">Optical Switching</a></li>
+                    <li><a href="analog-ai.html">Analog AI Chips</a></li>
+                </ul>
+            </div>
+
+            <div class="month-group">
+                <div class="month-label">October</div>
+                <ul class="article-list">
+                    <li><a href="backprop.html">Backpropagation</a></li>
+                    <li><a href="distance.html">Distance Measures</a></li>
+                </ul>
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        // Simple script to handle generic profile image if not found
+        document.getElementById('profile-img').onerror = function () {
+            this.src = 'https://ui-avatars.com/api/?name=Ethan+Dsouza&background=random&size=200';
+        };
+    </script>
+</body>
+
+</html>

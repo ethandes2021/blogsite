@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Visual Guide to Backpropagation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.8;
+            color: #2d3748;
+            background: #f7fafc;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 60px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            color: #1a202c;
+            line-height: 1.2;
+        }
+
+        h2 {
+            font-size: 1.8em;
+            margin: 50px 0 20px 0;
+            color: #2d3748;
+            border-bottom: 3px solid #4299e1;
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            font-size: 1.4em;
+            margin: 30px 0 15px 0;
+            color: #2d3748;
+        }
+
+        p {
+            margin-bottom: 20px;
+            font-size: 1.1em;
+        }
+
+        .intro {
+            font-size: 1.2em;
+            color: #4a5568;
+            margin-bottom: 40px;
+            border-left: 4px solid #4299e1;
+            padding-left: 20px;
+        }
+
+        canvas {
+            display: block;
+            margin: 30px auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .animation-container {
+            margin: 40px 0;
+            text-align: center;
+        }
+
+        .caption {
+            font-style: italic;
+            color: #718096;
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.95em;
+        }
+
+        code {
+            background: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .highlight-box {
+            background: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+
+        .math-block {
+            background: #f7fafc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .control-button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+
+        .control-button:hover {
+            background: #3182ce;
+        }
+
+        .control-button:active {
+            transform: scale(0.98);
+        }
+
+        .footer {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid #e2e8f0;
+            color: #718096;
+            text-align: center;
+        }
+
+        ul {
+            margin: 20px 0;
+            padding-left: 30px;
+        }
+
+        li {
+            margin: 10px 0;
+        }
+
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #4299e1;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .back-button:hover {
+            color: #2b6cb0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="index.html" class="back-button">← Back to Blog</a>
+        <div class="article-header-row">
+            <div class="article-header-text">
+                <h1>A Visual Guide to Backpropagation</h1>
+            </div>
+            <img src="assets/images/backprop-banner.png" alt="Backpropagation Banner" class="article-banner-side">
+        </div>
+
+        <p class="intro">
+            Neural networks learn through a process called backpropagation. But what exactly happens when we
+            "backpropagate" through a network? In this visual guide, we'll explore this fundamental algorithm through
+            interactive animations that reveal how neural networks adjust their weights to minimize error.
+        </p>
+
+        <p>
+            Backpropagation is the cornerstone of modern deep learning. Despite its importance, the algorithm often
+            feels like a black box. Through more than 15 visualizations, we'll build an intuition for how gradients flow
+            backward through a network, updating weights to improve predictions.
+        </p>
+
+        <h2>What is Backpropagation?</h2>
+
+        <p>
+            Backpropagation, short for "backward propagation of errors," is an algorithm for training neural networks.
+            It efficiently computes the gradient of the loss function with respect to each weight in the network.
+        </p>
+
+        <p>
+            Two main phases define the learning process:
+        </p>
+
+        <ul>
+            <li><strong>Forward Pass</strong> - Input data flows through the network, layer by layer, producing a
+                prediction.</li>
+            <li><strong>Backward Pass</strong> - The error flows backward through the network, computing gradients and
+                updating weights.</li>
+        </ul>
+
+        <div class="animation-container">
+            <canvas id="forwardPassCanvas" width="800" height="300"></canvas>
+            <p class="caption">The forward pass: data flows from input to output, generating a prediction.</p>
+            <button class="control-button" onclick="animateForwardPass()">Replay Animation</button>
+        </div>
+
+        <h2>The Forward Pass</h2>
+
+        <p>
+            Before we can backpropagate, we need to understand what happens during the forward pass. Let's visualize how
+            information flows through a simple neural network.
+        </p>
+
+        <h3>Computing Activations</h3>
+
+        <p>
+            At each layer, we compute a weighted sum of inputs plus a bias term, then apply an activation function:
+        </p>
+
+        <div class="math-block">
+            <p>\[z^{[l]} = W^{[l]} \cdot a^{[l-1]} + b^{[l]}\]</p>
+            <p>\[a^{[l]} = \sigma(z^{[l]})\]</p>
+        </div>
+
+        <p>
+            Where \(\sigma\) is the activation function (like ReLU or sigmoid), \(W^{[l]}\) are the weights, and
+            \(b^{[l]}\) is the bias for layer \(l\).
+        </p>
+
+        <div class="animation-container">
+            <canvas id="neuronComputationCanvas" width="800" height="400"></canvas>
+            <p class="caption">A single neuron computes a weighted sum and applies an activation function.</p>
+            <button class="control-button" onclick="animateNeuronComputation()">Replay Animation</button>
+        </div>
+
+        <h3>The Loss Function</h3>
+
+        <p>
+            After the forward pass completes, we compare our prediction with the actual target value using a loss
+            function. For regression, we might use Mean Squared Error (MSE):
+        </p>
+
+        <div class="math-block">
+            <p>\[L = \frac{1}{2}(y_{pred} - y_{true})^2\]</p>
+        </div>
+
+        <p>
+            This loss tells us how wrong our network is. The goal of backpropagation is to adjust the weights to
+            minimize this loss.
+        </p>
+
+        <h2>The Backward Pass</h2>
+
+        <p>
+            Now comes the magic. Backpropagation uses the chain rule from calculus to efficiently compute how much each
+            weight contributed to the error. These gradients tell us which direction to adjust each weight.
+        </p>
+
+        <h3>The Chain Rule</h3>
+
+        <p>
+            The chain rule is the mathematical foundation of backpropagation. It allows us to compute derivatives of
+            composite functions:
+        </p>
+
+        <div class="math-block">
+            <p>\[\frac{\partial L}{\partial w} = \frac{\partial L}{\partial a} \cdot \frac{\partial a}{\partial z} \cdot
+                \frac{\partial z}{\partial w}\]</p>
+        </div>
+
+        <p>
+            Let's break this down visually. Each term represents how sensitive one quantity is to changes in another.
+        </p>
+
+        <div class="animation-container">
+            <canvas id="chainRuleCanvas" width="800" height="350"></canvas>
+            <p class="caption">The chain rule in action: gradients multiply as they flow backward.</p>
+            <button class="control-button" onclick="animateChainRule()">Replay Animation</button>
+        </div>
+
+        <h3>Computing Gradients Layer by Layer</h3>
+
+        <p>
+            Backpropagation works by computing gradients starting from the output layer and moving backward through the
+            network. At each layer, we compute:
+        </p>
+
+        <div class="math-block">
+            <p>\[\frac{\partial L}{\partial W^{[l]}} = \frac{\partial L}{\partial z^{[l]}} \cdot (a^{[l-1]})^T\]</p>
+            <p>\[\frac{\partial L}{\partial b^{[l]}} = \frac{\partial L}{\partial z^{[l]}}\]</p>
+            <p>\[\frac{\partial L}{\partial a^{[l-1]}} = (W^{[l]})^T \cdot \frac{\partial L}{\partial z^{[l]}}\]</p>
+        </div>
+
+        <div class="animation-container">
+            <canvas id="backpropCanvas" width="800" height="400"></canvas>
+            <p class="caption">Gradients flow backward through the network, layer by layer.</p>
+            <button class="control-button" onclick="animateBackprop()">Replay Animation</button>
+        </div>
+
+        <h2>Gradient Descent: Updating Weights</h2>
+
+        <p>
+            Once we've computed the gradients, we update the weights using gradient descent:
+        </p>
+
+        <div class="math-block">
+            <p>\[W^{[l]} = W^{[l]} - \alpha \frac{\partial L}{\partial W^{[l]}}\]</p>
+        </div>
+
+        <p>
+            Where \(\alpha\) is the learning rate, a hyperparameter that controls how big our update steps are.
+        </p>
+
+        <div class="animation-container">
+            <canvas id="gradientDescentCanvas" width="800" height="400"></canvas>
+            <p class="caption">Gradient descent finds the minimum of the loss function by iteratively updating weights.
+            </p>
+            <button class="control-button" onclick="animateGradientDescent()">Replay Animation</button>
+        </div>
+
+        <h3>The Learning Rate</h3>
+
+        <p>
+            The learning rate is crucial. Too large, and we might overshoot the minimum. Too small, and training will be
+            painfully slow.
+        </p>
+
+        <div class="highlight-box">
+            <strong>Key Insight:</strong> The learning rate determines how aggressively we update weights. Finding the
+            right learning rate is often critical for successful training.
+        </div>
+
+        <h2>A Complete Example</h2>
+
+        <p>
+            Let's put everything together and watch a complete training iteration: forward pass, loss computation,
+            backward pass, and weight update.
+        </p>
+
+        <div class="animation-container">
+            <canvas id="completeExampleCanvas" width="800" height="450"></canvas>
+            <p class="caption">A complete training iteration from forward pass to weight update.</p>
+            <button class="control-button" onclick="animateCompleteExample()">Replay Animation</button>
+        </div>
+
+        <h2>Why Backpropagation Matters</h2>
+
+        <p>
+            Before backpropagation was popularized in the 1980s, training neural networks was extremely difficult.
+            Backpropagation made it possible to train deep networks efficiently by:
+        </p>
+
+        <ul>
+            <li>Computing gradients for millions of parameters in reasonable time</li>
+            <li>Enabling automatic differentiation frameworks like PyTorch and TensorFlow</li>
+            <li>Making deep learning practical and scalable</li>
+        </ul>
+
+        <div class="highlight-box">
+            <strong>Historical Note:</strong> While the basic idea of backpropagation dates back to the 1960s, it wasn't
+            widely adopted until Rumelhart, Hinton, and Williams popularized it in their 1986 paper "Learning
+            representations by back-propagating errors."
+        </div>
+
+        <h2>Common Challenges</h2>
+
+        <h3>Vanishing Gradients</h3>
+
+        <p>
+            In deep networks, gradients can become extremely small as they propagate backward, effectively preventing
+            early layers from learning. This is called the vanishing gradient problem.
+        </p>
+
+        <div class="animation-container">
+            <canvas id="vanishingGradientCanvas" width="800" height="350"></canvas>
+            <p class="caption">Vanishing gradients: gradients shrink as they flow through many layers.</p>
+            <button class="control-button" onclick="animateVanishingGradient()">Replay Animation</button>
+        </div>
+
+        <h3>Exploding Gradients</h3>
+
+        <p>
+            Conversely, gradients can also grow exponentially large, causing unstable training. This is the exploding
+            gradient problem.
+        </p>
+
+        <p>
+            Modern solutions include:
+        </p>
+        <ul>
+            <li>Using ReLU activation functions instead of sigmoid</li>
+            <li>Batch normalization to stabilize gradients</li>
+            <li>Gradient clipping to prevent explosions</li>
+            <li>Residual connections (skip connections) in architectures like ResNet</li>
+        </ul>
+
+        <h2>Beyond Basic Backpropagation</h2>
+
+        <p>
+            Modern deep learning has extended backpropagation in several ways:
+        </p>
+
+        <ul>
+            <li><strong>Momentum</strong> - Accumulates gradients over time to accelerate convergence</li>
+            <li><strong>Adam Optimizer</strong> - Adapts learning rates for each parameter individually</li>
+            <li><strong>Mini-batch Training</strong> - Computes gradients over small batches for efficiency</li>
+            <li><strong>Automatic Differentiation</strong> - Frameworks automatically compute gradients for any
+                computation graph</li>
+        </ul>
+
+        <h2>Conclusion</h2>
+
+        <p>
+            Backpropagation is the engine that powers modern deep learning. By efficiently computing gradients through
+            the chain rule, it enables networks with millions or billions of parameters to learn from data.
+        </p>
+
+        <p>
+            Understanding backpropagation deeply provides insight into:
+        </p>
+
+        <ul>
+            <li>Why certain architectures work better than others</li>
+            <li>How to debug training problems</li>
+            <li>How to design custom layers and loss functions</li>
+            <li>The fundamentals underlying all neural network training</li>
+        </ul>
+
+        <div class="highlight-box">
+            <strong>Next Steps:</strong> Now that you understand backpropagation, explore how it applies to
+            convolutional layers, recurrent networks, and attention mechanisms. Each architecture requires adapting the
+            core backpropagation algorithm to its specific structure.
+        </div>
+
+        <div class="footer">
+            <p>Thank you for reading! I hope these visualizations helped demystify backpropagation.</p>
+            <p>Feel free to share this guide with anyone learning about neural networks.</p>
+        </div>
+    </div>
+
+    <script>
+        // Animation 1: Forward Pass
+        function animateForwardPass() {
+            const canvas = document.getElementById('forwardPassCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const layers = [
+                { x: 100, neurons: 3, label: 'Input' },
+                { x: 300, neurons: 4, label: 'Hidden' },
+                { x: 500, neurons: 4, label: 'Hidden' },
+                { x: 700, neurons: 1, label: 'Output' }
+            ];
+
+            const neuronRadius = 20;
+            const yStart = 80;
+            const ySpacing = 50;
+
+            // Draw all neurons
+            layers.forEach((layer, layerIdx) => {
+                const yOffset = (4 - layer.neurons) * ySpacing / 2;
+                for (let i = 0; i < layer.neurons; i++) {
+                    ctx.beginPath();
+                    ctx.arc(layer.x, yStart + i * ySpacing + yOffset, neuronRadius, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.fill();
+                    ctx.strokeStyle = '#cbd5e0';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                // Draw labels
+                ctx.fillStyle = '#2d3748';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(layer.label, layer.x, 30);
+            });
+
+            // Animate signal propagation
+            let currentLayer = 0;
+            const animateSignal = () => {
+                if (currentLayer >= layers.length) return;
+
+                const layer = layers[currentLayer];
+                const yOffset = (4 - layer.neurons) * ySpacing / 2;
+
+                // Highlight neurons in current layer
+                for (let i = 0; i < layer.neurons; i++) {
+                    ctx.beginPath();
+                    ctx.arc(layer.x, yStart + i * ySpacing + yOffset, neuronRadius, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#4299e1';
+                    ctx.fill();
+                    ctx.strokeStyle = '#3182ce';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                // Draw connections to next layer
+                if (currentLayer < layers.length - 1) {
+                    const nextLayer = layers[currentLayer + 1];
+                    const nextYOffset = (4 - nextLayer.neurons) * ySpacing / 2;
+
+                    for (let i = 0; i < layer.neurons; i++) {
+                        for (let j = 0; j < nextLayer.neurons; j++) {
+                            ctx.beginPath();
+                            ctx.moveTo(layer.x + neuronRadius, yStart + i * ySpacing + yOffset);
+                            ctx.lineTo(nextLayer.x - neuronRadius, yStart + j * ySpacing + nextYOffset);
+                            ctx.strokeStyle = '#90cdf4';
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                currentLayer++;
+                setTimeout(animateSignal, 800);
+            };
+
+            animateSignal();
+        }
+
+        // Animation 2: Neuron Computation
+        function animateNeuronComputation() {
+            const canvas = document.getElementById('neuronComputationCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const neuronX = 400;
+            const neuronY = 200;
+            const neuronRadius = 40;
+            const inputs = [
+                { x: 150, y: 100, value: 0.5, weight: 0.8 },
+                { x: 150, y: 200, value: 0.3, weight: -0.5 },
+                { x: 150, y: 300, value: 0.7, weight: 0.6 }
+            ];
+
+            let step = 0;
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw input neurons
+                inputs.forEach((input, idx) => {
+                    ctx.beginPath();
+                    ctx.arc(input.x, input.y, 25, 0, 2 * Math.PI);
+                    ctx.fillStyle = step >= 0 ? '#4299e1' : '#e2e8f0';
+                    ctx.fill();
+                    ctx.strokeStyle = '#cbd5e0';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Draw value
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = '14px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(input.value.toFixed(1), input.x, input.y + 5);
+
+                    // Draw connections and weights
+                    ctx.beginPath();
+                    ctx.moveTo(input.x + 25, input.y);
+                    ctx.lineTo(neuronX - neuronRadius, neuronY);
+                    ctx.strokeStyle = step >= idx + 1 ? '#48bb78' : '#cbd5e0';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    if (step >= idx + 1) {
+                        const midX = (input.x + 25 + neuronX - neuronRadius) / 2;
+                        const midY = (input.y + neuronY) / 2;
+                        ctx.fillStyle = '#2d3748';
+                        ctx.font = '12px sans-serif';
+                        ctx.fillText(`w=${input.weight}`, midX, midY - 5);
+                    }
+                });
+
+                // Draw main neuron
+                ctx.beginPath();
+                ctx.arc(neuronX, neuronY, neuronRadius, 0, 2 * Math.PI);
+                ctx.fillStyle = step >= 4 ? '#48bb78' : '#e2e8f0';
+                ctx.fill();
+                ctx.strokeStyle = '#cbd5e0';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // Draw computation
+                if (step >= 4) {
+                    const sum = inputs.reduce((acc, inp) => acc + inp.value * inp.weight, 0) + 0.1;
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = '14px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`Σ = ${sum.toFixed(2)}`, neuronX, neuronY);
+                }
+
+                if (step >= 5) {
+                    const sum = inputs.reduce((acc, inp) => acc + inp.value * inp.weight, 0) + 0.1;
+                    const activated = Math.max(0, sum); // ReLU
+
+                    // Draw output
+                    ctx.beginPath();
+                    ctx.arc(650, neuronY, 30, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#f6ad55';
+                    ctx.fill();
+                    ctx.strokeStyle = '#dd6b20';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#2d3748';
+                    ctx.fillText(activated.toFixed(2), 650, neuronY + 5);
+
+                    // Arrow
+                    ctx.beginPath();
+                    ctx.moveTo(neuronX + neuronRadius, neuronY);
+                    ctx.lineTo(620, neuronY);
+                    ctx.strokeStyle = '#f6ad55';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    ctx.fillText('ReLU(Σ)', 535, neuronY - 20);
+                }
+
+                step++;
+                if (step <= 6) {
+                    setTimeout(animate, 700);
+                }
+            };
+
+            animate();
+        }
+
+        // Animation 3: Chain Rule
+        function animateChainRule() {
+            const canvas = document.getElementById('chainRuleCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const boxes = [
+                { x: 100, y: 150, label: 'Loss\nL', value: '', color: '#fc8181' },
+                { x: 250, y: 150, label: 'Activation\na', value: '', color: '#f6ad55' },
+                { x: 400, y: 150, label: 'Weighted Sum\nz', value: '', color: '#90cdf4' },
+                { x: 550, y: 150, label: 'Weight\nw', value: '', color: '#68d391' }
+            ];
+
+            let step = 0;
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw boxes
+                boxes.forEach((box, idx) => {
+                    ctx.fillStyle = idx <= step ? box.color : '#e2e8f0';
+                    ctx.fillRect(box.x - 50, box.y - 40, 100, 80);
+                    ctx.strokeStyle = '#2d3748';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(box.x - 50, box.y - 40, 100, 80);
+
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = '14px sans-serif';
+                    ctx.textAlign = 'center';
+                    const lines = box.label.split('\n');
+                    lines.forEach((line, lineIdx) => {
+                        ctx.fillText(line, box.x, box.y - 5 + lineIdx * 18);
+                    });
+                });
+
+                // Draw arrows and gradients
+                for (let i = 0; i < boxes.length - 1; i++) {
+                    if (step > i) {
+                        const startX = boxes[i].x + 50;
+                        const endX = boxes[i + 1].x - 50;
+                        const y = boxes[i].y;
+
+                        // Arrow
+                        ctx.beginPath();
+                        ctx.moveTo(startX, y);
+                        ctx.lineTo(endX, y);
+                        ctx.strokeStyle = '#2d3748';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        // Arrowhead
+                        ctx.beginPath();
+                        ctx.moveTo(endX, y);
+                        ctx.lineTo(endX - 10, y - 5);
+                        ctx.lineTo(endX - 10, y + 5);
+                        ctx.closePath();
+                        ctx.fillStyle = '#2d3748';
+                        ctx.fill();
+
+                        // Gradient label
+                        const midX = (startX + endX) / 2;
+                        ctx.fillStyle = '#2d3748';
+                        ctx.font = '13px sans-serif';
+
+                        const labels = ['∂L/∂a', '∂a/∂z', '∂z/∂w'];
+                        ctx.fillText(labels[i], midX, y - 15);
+                    }
+                }
+
+                // Final result
+                if (step >= 4) {
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = 'bold 16px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('∂L/∂w = ∂L/∂a × ∂a/∂z × ∂z/∂w', 400, 280);
+
+                    // Draw result box
+                    ctx.fillStyle = '#c6f6d5';
+                    ctx.fillRect(250, 240, 300, 50);
+                    ctx.strokeStyle = '#48bb78';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(250, 240, 300, 50);
+                }
+
+                step++;
+                if (step <= 5) {
+                    setTimeout(animate, 900);
+                }
+            };
+
+            animate();
+        }
+
+        // Animation 4: Backpropagation
+        function animateBackprop() {
+            const canvas = document.getElementById('backpropCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const layers = [
+                { x: 100, neurons: 3, label: 'Input', color: '#e2e8f0' },
+                { x: 300, neurons: 4, label: 'Hidden 1', color: '#e2e8f0' },
+                { x: 500, neurons: 4, label: 'Hidden 2', color: '#e2e8f0' },
+                { x: 700, neurons: 1, label: 'Output', color: '#fc8181' }
+            ];
+
+            const neuronRadius = 20;
+            const yStart = 80;
+            const ySpacing = 50;
+
+            let currentLayer = layers.length - 1;
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw all layers
+                layers.forEach((layer, layerIdx) => {
+                    const yOffset = (4 - layer.neurons) * ySpacing / 2;
+
+                    for (let i = 0; i < layer.neurons; i++) {
+                        ctx.beginPath();
+                        ctx.arc(layer.x, yStart + i * ySpacing + yOffset, neuronRadius, 0, 2 * Math.PI);
+
+                        if (layerIdx >= currentLayer) {
+                            ctx.fillStyle = layerIdx === layers.length - 1 ? '#fc8181' : '#f6ad55';
+                        } else {
+                            ctx.fillStyle = '#e2e8f0';
+                        }
+
+                        ctx.fill();
+                        ctx.strokeStyle = '#cbd5e0';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+
+                    // Layer labels
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = '14px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(layer.label, layer.x, 30);
+                });
+
+                // Draw gradient flow arrows
+                for (let i = layers.length - 1; i > currentLayer; i--) {
+                    const layer = layers[i];
+                    const prevLayer = layers[i - 1];
+                    const yOffset1 = (4 - layer.neurons) * ySpacing / 2;
+                    const yOffset2 = (4 - prevLayer.neurons) * ySpacing / 2;
+
+                    for (let j = 0; j < prevLayer.neurons; j++) {
+                        for (let k = 0; k < layer.neurons; k++) {
+                            ctx.beginPath();
+                            ctx.moveTo(layer.x - neuronRadius, yStart + k * ySpacing + yOffset1);
+                            ctx.lineTo(prevLayer.x + neuronRadius, yStart + j * ySpacing + yOffset2);
+                            ctx.strokeStyle = '#f6ad55';
+                            ctx.lineWidth = 2;
+                            ctx.stroke();
+
+                            // Arrowhead
+                            const angle = Math.atan2(
+                                (yStart + j * ySpacing + yOffset2) - (yStart + k * ySpacing + yOffset1),
+                                (prevLayer.x + neuronRadius) - (layer.x - neuronRadius)
+                            );
+                            const arrowX = prevLayer.x + neuronRadius;
+                            const arrowY = yStart + j * ySpacing + yOffset2;
+
+                            ctx.save();
+                            ctx.translate(arrowX, arrowY);
+                            ctx.rotate(angle);
+                            ctx.beginPath();
+                            ctx.moveTo(0, 0);
+                            ctx.lineTo(-10, -5);
+                            ctx.lineTo(-10, 5);
+                            ctx.closePath();
+                            ctx.fillStyle = '#f6ad55';
+                            ctx.fill();
+                            ctx.restore();
+                        }
+                    }
+                }
+
+                // Gradient text
+                ctx.fillStyle = '#2d3748';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Gradients flowing backward →', 400, 350);
+
+                currentLayer--;
+                if (currentLayer >= 0) {
+                    setTimeout(animate, 1000);
+                }
+            };
+
+            animate();
+        }
+
+        // Animation 5: Gradient Descent
+        function animateGradientDescent() {
+            const canvas = document.getElementById('gradientDescentCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = 400;
+            const centerY = 350;
+            const scale = 80;
+
+            // Loss landscape function (simple bowl)
+            const loss = (x, y) => {
+                return 0.5 * (x * x + y * y);
+            };
+
+            // Draw loss landscape
+            ctx.strokeStyle = '#cbd5e0';
+            ctx.lineWidth = 1;
+
+            for (let i = -3; i <= 3; i += 0.5) {
+                ctx.beginPath();
+                for (let j = -3; j <= 3; j += 0.1) {
+                    const z = loss(i, j);
+                    const screenX = centerX + j * scale;
+                    const screenY = centerY - z * 20 - i * scale;
+
+                    if (j === -3) {
+                        ctx.moveTo(screenX, screenY);
+                    } else {
+                        ctx.lineTo(screenX, screenY);
+                    }
+                }
+                ctx.stroke();
+            }
+
+            for (let j = -3; j <= 3; j += 0.5) {
+                ctx.beginPath();
+                for (let i = -3; i <= 3; i += 0.1) {
+                    const z = loss(i, j);
+                    const screenX = centerX + j * scale;
+                    const screenY = centerY - z * 20 - i * scale;
+
+                    if (i === -3) {
+                        ctx.moveTo(screenX, screenY);
+                    } else {
+                        ctx.lineTo(screenX, screenY);
+                    }
+                }
+                ctx.stroke();
+            }
+
+            // Animate gradient descent
+            let position = { x: 2.5, y: 2.0 };
+            const learningRate = 0.15;
+            let step = 0;
+
+            const animate = () => {
+                if (step > 20) return;
+
+                // Draw current position
+                const z = loss(position.x, position.y);
+                const screenX = centerX + position.y * scale;
+                const screenY = centerY - z * 20 - position.x * scale;
+
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, 8, 0, 2 * Math.PI);
+                ctx.fillStyle = '#fc8181';
+                ctx.fill();
+                ctx.strokeStyle = '#e53e3e';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // Draw gradient vector
+                const gradX = position.x;
+                const gradY = position.y;
+                const gradScreenX = centerX + (position.y - gradY * 0.3) * scale;
+                const gradScreenY = centerY - loss(position.x - gradX * 0.3, position.y - gradY * 0.3) * 20 - (position.x - gradX * 0.3) * scale;
+
+                ctx.beginPath();
+                ctx.moveTo(screenX, screenY);
+                ctx.lineTo(gradScreenX, gradScreenY);
+                ctx.strokeStyle = '#4299e1';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // Update position
+                position.x -= learningRate * gradX;
+                position.y -= learningRate * gradY;
+
+                // Labels
+                ctx.fillStyle = '#2d3748';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(`Step: ${step}`, 20, 30);
+                ctx.fillText(`Loss: ${loss(position.x, position.y).toFixed(3)}`, 20, 50);
+
+                step++;
+                setTimeout(animate, 400);
+            };
+
+            animate();
+        }
+
+        // Animation 6: Complete Example
+        function animateCompleteExample() {
+            const canvas = document.getElementById('completeExampleCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let phase = 0; // 0: forward, 1: loss, 2: backward, 3: update
+            let step = 0;
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw network
+                const layers = [
+                    { x: 100, neurons: 2 },
+                    { x: 300, neurons: 3 },
+                    { x: 500, neurons: 2 },
+                    { x: 700, neurons: 1 }
+                ];
+
+                const neuronRadius = 20;
+                const yStart = 150;
+                const ySpacing = 60;
+
+                layers.forEach((layer, layerIdx) => {
+                    const yOffset = (3 - layer.neurons) * ySpacing / 2;
+
+                    for (let i = 0; i < layer.neurons; i++) {
+                        ctx.beginPath();
+                        ctx.arc(layer.x, yStart + i * ySpacing + yOffset, neuronRadius, 0, 2 * Math.PI);
+
+                        if (phase === 0 && layerIdx <= step) {
+                            ctx.fillStyle = '#4299e1';
+                        } else if (phase === 1 && layerIdx === layers.length - 1) {
+                            ctx.fillStyle = '#fc8181';
+                        } else if (phase === 2 && layerIdx >= layers.length - 1 - step) {
+                            ctx.fillStyle = '#f6ad55';
+                        } else if (phase === 3) {
+                            ctx.fillStyle = '#48bb78';
+                        } else {
+                            ctx.fillStyle = '#e2e8f0';
+                        }
+
+                        ctx.fill();
+                        ctx.strokeStyle = '#cbd5e0';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                });
+
+                // Phase indicator
+                ctx.fillStyle = '#2d3748';
+                ctx.font = 'bold 18px sans-serif';
+                ctx.textAlign = 'center';
+
+                const phaseNames = ['Forward Pass', 'Computing Loss', 'Backward Pass', 'Weight Update'];
+                ctx.fillText(phaseNames[phase], 400, 40);
+
+                // Progress bar
+                const totalSteps = 4 + 1 + 4 + 1;
+                const currentStep = phase === 0 ? step : phase === 1 ? 4 + step : phase === 2 ? 5 + step : 10;
+                const progress = currentStep / totalSteps;
+
+                ctx.fillStyle = '#e2e8f0';
+                ctx.fillRect(200, 400, 400, 20);
+                ctx.fillStyle = '#4299e1';
+                ctx.fillRect(200, 400, 400 * progress, 20);
+                ctx.strokeStyle = '#cbd5e0';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(200, 400, 400, 20);
+
+                // Advance animation
+                if (phase === 0) {
+                    step++;
+                    if (step >= 4) {
+                        phase = 1;
+                        step = 0;
+                    }
+                } else if (phase === 1) {
+                    step++;
+                    if (step >= 1) {
+                        phase = 2;
+                        step = 0;
+                    }
+                } else if (phase === 2) {
+                    step++;
+                    if (step >= 4) {
+                        phase = 3;
+                        step = 0;
+                    }
+                } else if (phase === 3) {
+                    step++;
+                }
+
+                if (phase < 3 || (phase === 3 && step < 2)) {
+                    setTimeout(animate, 600);
+                }
+            };
+
+            animate();
+        }
+
+        // Animation 7: Vanishing Gradient
+        function animateVanishingGradient() {
+            const canvas = document.getElementById('vanishingGradientCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const layers = 8;
+            const startX = 100;
+            const spacing = 85;
+            const y = 175;
+
+            let currentLayer = layers - 1;
+            let gradient = 1.0;
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw layers
+                for (let i = 0; i < layers; i++) {
+                    const x = startX + i * spacing;
+                    const opacity = i >= currentLayer ? Math.max(0.1, gradient * Math.pow(0.3, layers - 1 - i)) : 0.1;
+
+                    ctx.fillStyle = `rgba(66, 153, 225, ${opacity})`;
+                    ctx.fillRect(x - 20, y - 40, 40, 80);
+                    ctx.strokeStyle = '#2d3748';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x - 20, y - 40, 40, 80);
+
+                    // Layer number
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = '12px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`L${i + 1}`, x, y + 60);
+
+                    // Gradient value
+                    if (i >= currentLayer) {
+                        const gradValue = gradient * Math.pow(0.3, layers - 1 - i);
+                        ctx.fillText(gradValue.toFixed(4), x, y + 80);
+                    }
+                }
+
+                // Draw gradient flow
+                for (let i = layers - 1; i > currentLayer; i--) {
+                    const x1 = startX + i * spacing;
+                    const x2 = startX + (i - 1) * spacing;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x1 - 20, y);
+                    ctx.lineTo(x2 + 20, y);
+                    ctx.strokeStyle = '#f6ad55';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    // Arrow
+                    ctx.beginPath();
+                    ctx.moveTo(x2 + 20, y);
+                    ctx.lineTo(x2 + 30, y - 6);
+                    ctx.lineTo(x2 + 30, y + 6);
+                    ctx.closePath();
+                    ctx.fillStyle = '#f6ad55';
+                    ctx.fill();
+
+                    // Multiply by 0.3
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = '12px sans-serif';
+                    ctx.fillText('×0.3', (x1 + x2) / 2, y - 15);
+                }
+
+                // Title
+                ctx.fillStyle = '#2d3748';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Gradient shrinks exponentially as it propagates backward', 400, 30);
+
+                currentLayer--;
+                if (currentLayer >= 0) {
+                    setTimeout(animate, 800);
+                }
+            };
+
+            animate();
+        }
+
+        // Initialize first animation
+        setTimeout(() => {
+            animateForwardPass();
+        }, 500);
+    </script>
+</body>
+
+</html>

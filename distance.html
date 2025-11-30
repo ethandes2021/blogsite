@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Visual Guide to Distance Measures in Data Science</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.8;
+            color: #2d3748;
+            background: #f7fafc;
+        }
+
+        .article-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 60px 40px 60px;
+        }
+
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+            text-decoration: none;
+            margin-bottom: 20px;
+            opacity: 0.9;
+            transition: opacity 0.3s;
+        }
+
+        .back-button:hover {
+            opacity: 1;
+        }
+
+        .article-title {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            line-height: 1.2;
+        }
+
+        .article-meta {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .article-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px;
+            background: white;
+        }
+
+        h2 {
+            font-size: 1.8em;
+            margin: 50px 0 20px 0;
+            color: #2d3748;
+            border-bottom: 3px solid #4299e1;
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            font-size: 1.4em;
+            margin: 30px 0 15px 0;
+            color: #2d3748;
+        }
+
+        p {
+            margin-bottom: 20px;
+            font-size: 1.1em;
+        }
+
+        .intro {
+            font-size: 1.2em;
+            color: #4a5568;
+            margin-bottom: 40px;
+            border-left: 4px solid #4299e1;
+            padding-left: 20px;
+        }
+
+        canvas {
+            display: block;
+            margin: 30px auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background: white;
+        }
+
+        .animation-container {
+            margin: 40px 0;
+            text-align: center;
+        }
+
+        .caption {
+            font-style: italic;
+            color: #718096;
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.95em;
+        }
+
+        .math-block {
+            background: #f7fafc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .highlight-box {
+            background: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            background: #fef5e7;
+            border-left: 4px solid #f6ad55;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+
+        .control-button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+
+        .control-button:hover {
+            background: #3182ce;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .comparison-card {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .comparison-card h4 {
+            color: #4299e1;
+            margin-bottom: 10px;
+        }
+
+        ul {
+            margin: 20px 0;
+            padding-left: 30px;
+        }
+
+        li {
+            margin: 10px 0;
+        }
+
+        code {
+            background: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #f7fafc;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        tr:hover {
+            background: #f7fafc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="index.html" class="back-button">← Back to Blog</a>
+        <div class="article-header-row">
+            <div class="article-header-text">
+                <h1>A Visual Guide to Distance Measures in Data Science</h1>
+                <div class="article-meta">November 18, 2025 • 18 min read</div>
+            </div>
+            <img src="assets/images/distance-banner.png" alt="Distance Measures Banner" class="article-banner-side">
+        </div>
+    </div>
+
+    <div class="article-content">
+        <p class="intro">
+            Distance measures are the foundation of many machine learning algorithms. From clustering to classification,
+            recommendation systems to anomaly detection—understanding how we measure similarity and dissimilarity
+            between data points is crucial. In this visual guide, we'll explore the most important distance metrics
+            through interactive animations.
+        </p>
+
+        <p>
+            Every time you use k-nearest neighbors, k-means clustering, or even search for similar products online,
+            distance measures are working behind the scenes. But which distance metric should you use? The answer
+            depends on your data's structure and the problem you're solving.
+        </p>
+
+        <h2>What is a Distance Measure?</h2>
+
+        <p>
+            A distance measure (or metric) quantifies how similar or different two data points are. Mathematically, a
+            function \(d(x, y)\) is a valid distance metric if it satisfies four properties:
+        </p>
+
+        <ul>
+            <li><strong>Non-negativity:</strong> \(d(x, y) \geq 0\)</li>
+            <li><strong>Identity:</strong> \(d(x, y) = 0\) if and only if \(x = y\)</li>
+            <li><strong>Symmetry:</strong> \(d(x, y) = d(y, x)\)</li>
+            <li><strong>Triangle inequality:</strong> \(d(x, z) \leq d(x, y) + d(y, z)\)</li>
+        </ul>
+
+        <div class="animation-container">
+            <canvas id="triangleInequalityCanvas" width="800" height="400"></canvas>
+            <p class="caption">The triangle inequality: the direct path is never longer than going through an
+                intermediate point.</p>
+            <button class="control-button" onclick="animateTriangleInequality()">Replay Animation</button>
+        </div>
+
+        <h2>Euclidean Distance</h2>
+
+        <p>
+            The most intuitive distance measure is Euclidean distance—the straight-line distance between two points.
+            This is what we commonly think of as "distance" in everyday life.
+        </p>
+
+        <div class="math-block">
+            <p>\[d_{Euclidean}(x, y) = \sqrt{\sum_{i=1}^{n}(x_i - y_i)^2}\]</p>
+        </div>
+
+        <p>
+            In 2D space, this simplifies to the familiar Pythagorean theorem: \(d = \sqrt{(x_2-x_1)^2 + (y_2-y_1)^2}\)
+        </p>
+
+        <div class="animation-container">
+            <canvas id="euclideanCanvas" width="800" height="500"></canvas>
+            <p class="caption">Euclidean distance: the straight-line path between two points.</p>
+            <button class="control-button" onclick="animateEuclidean()">Replay Animation</button>
+        </div>
+
+        <h3>When to Use Euclidean Distance</h3>
+
+        <ul>
+            <li>Data with continuous numerical features</li>
+            <li>When the magnitude of differences matters</li>
+            <li>Spatial data (coordinates, geographic locations)</li>
+            <li>Image similarity (pixel-by-pixel comparison)</li>
+        </ul>
+
+        <div class="warning-box">
+            <strong>Caution:</strong> Euclidean distance is sensitive to feature scale. Always normalize or standardize
+            your features before using Euclidean distance, or features with larger ranges will dominate the calculation.
+        </div>
+
+        <h2>Manhattan Distance</h2>
+
+        <p>
+            Manhattan distance (also called L1 distance or Taxicab distance) measures the distance traveled along grid
+            lines, like navigating city blocks in Manhattan.
+        </p>
+
+        <div class="math-block">
+            <p>\[d_{Manhattan}(x, y) = \sum_{i=1}^{n}|x_i - y_i|\]</p>
+        </div>
+
+        <div class="animation-container">
+            <canvas id="manhattanCanvas" width="800" height="500"></canvas>
+            <p class="caption">Manhattan distance: moving along grid lines like navigating city blocks.</p>
+            <button class="control-button" onclick="animateManhattan()">Replay Animation</button>
+        </div>
+
+        <h3>Euclidean vs Manhattan: A Comparison</h3>
+
+        <p>
+            Let's see how these two metrics differ when measuring the same distance:
+        </p>
+
+        <div class="animation-container">
+            <canvas id="eucVsManhattanCanvas" width="800" height="500"></canvas>
+            <p class="caption">Comparing Euclidean (blue) and Manhattan (red) distances between the same points.</p>
+            <button class="control-button" onclick="animateEucVsManhattan()">Replay Animation</button>
+        </div>
+
+        <h3>When to Use Manhattan Distance</h3>
+
+        <ul>
+            <li>Grid-based problems (chess moves, robot navigation)</li>
+            <li>When you want equal weight for each dimension</li>
+            <li>High-dimensional spaces (less affected by the curse of dimensionality)</li>
+            <li>More robust to outliers than Euclidean distance</li>
+        </ul>
+
+        <h2>Minkowski Distance</h2>
+
+        <p>
+            Minkowski distance is a generalization that includes both Euclidean and Manhattan distances as special
+            cases:
+        </p>
+
+        <div class="math-block">
+            <p>\[d_{Minkowski}(x, y) = \left(\sum_{i=1}^{n}|x_i - y_i|^p\right)^{1/p}\]</p>
+        </div>
+
+        <p>
+            Where \(p\) is a parameter:
+        </p>
+        <ul>
+            <li>\(p = 1\): Manhattan distance</li>
+            <li>\(p = 2\): Euclidean distance</li>
+            <li>\(p = \infty\): Chebyshev distance (maximum difference in any dimension)</li>
+        </ul>
+
+        <div class="animation-container">
+            <canvas id="minkowskiCanvas" width="800" height="500"></canvas>
+            <p class="caption">How distance changes as we vary the Minkowski parameter p.</p>
+            <button class="control-button" onclick="animateMinkowski()">Replay Animation</button>
+        </div>
+
+        <h2>Cosine Similarity</h2>
+
+        <p>
+            Unlike the previous metrics, cosine similarity measures the angle between vectors rather than their
+            magnitude. It's particularly useful when the direction matters more than the length.
+        </p>
+
+        <div class="math-block">
+            <p>\[cosine\_similarity(x, y) = \frac{x \cdot y}{||x|| \cdot ||y||} = \frac{\sum_{i=1}^{n}x_i
+                y_i}{\sqrt{\sum_{i=1}^{n}x_i^2} \cdot \sqrt{\sum_{i=1}^{n}y_i^2}}\]</p>
+        </div>
+
+        <p>
+            Cosine distance is then: \(d_{cosine} = 1 - cosine\_similarity\)
+        </p>
+
+        <div class="animation-container">
+            <canvas id="cosineCanvas" width="800" height="500"></canvas>
+            <p class="caption">Cosine similarity: measuring the angle between vectors, not their length.</p>
+            <button class="control-button" onclick="animateCosine()">Replay Animation</button>
+        </div>
+
+        <h3>When to Use Cosine Similarity</h3>
+
+        <ul>
+            <li>Text analysis and NLP (document similarity)</li>
+            <li>Recommendation systems (user preference vectors)</li>
+            <li>When magnitude is less important than direction</li>
+            <li>High-dimensional sparse data (like TF-IDF vectors)</li>
+        </ul>
+
+        <div class="highlight-box">
+            <strong>Key Insight:</strong> Two documents could have very different word counts but be considered similar
+            if they discuss the same topics. Cosine similarity captures this by focusing on the pattern of words rather
+            than their absolute frequencies.
+        </div>
+
+        <h2>Hamming Distance</h2>
+
+        <p>
+            Hamming distance measures the number of positions at which two strings or vectors differ. It's designed for
+            categorical or binary data.
+        </p>
+
+        <div class="math-block">
+            <p>\[d_{Hamming}(x, y) = \sum_{i=1}^{n} \mathbb{1}(x_i \neq y_i)\]</p>
+        </div>
+
+        <p>
+            Where \(\mathbb{1}\) is the indicator function (1 if the condition is true, 0 otherwise).
+        </p>
+
+        <div class="animation-container">
+            <canvas id="hammingCanvas" width="800" height="400"></canvas>
+            <p class="caption">Hamming distance: counting positions where elements differ.</p>
+            <button class="control-button" onclick="animateHamming()">Replay Animation</button>
+        </div>
+
+        <h3>When to Use Hamming Distance</h3>
+
+        <ul>
+            <li>Binary strings or vectors</li>
+            <li>Error detection and correction codes</li>
+            <li>Categorical data (one-hot encoded features)</li>
+            <li>DNA sequence comparison</li>
+        </ul>
+
+        <h2>Mahalanobis Distance</h2>
+
+        <p>
+            Mahalanobis distance accounts for correlations between variables and the variance of each variable. It's
+            scale-invariant and considers the distribution of the data.
+        </p>
+
+        <div class="math-block">
+            <p>\[d_{Mahalanobis}(x, y) = \sqrt{(x-y)^T S^{-1} (x-y)}\]</p>
+        </div>
+
+        <p>
+            Where \(S\) is the covariance matrix of the data.
+        </p>
+
+        <div class="animation-container">
+            <canvas id="mahalanobisCanvas" width="800" height="500"></canvas>
+            <p class="caption">Mahalanobis distance: accounting for correlation and variance in the data.</p>
+            <button class="control-button" onclick="animateMahalanobis()">Replay Animation</button>
+        </div>
+
+        <h3>When to Use Mahalanobis Distance</h3>
+
+        <ul>
+            <li>When features are correlated</li>
+            <li>Anomaly detection (points far from the distribution center)</li>
+            <li>Multivariate data with different scales</li>
+            <li>When you need a scale-invariant distance</li>
+        </ul>
+
+        <div class="highlight-box">
+            <strong>Key Advantage:</strong> Unlike Euclidean distance, Mahalanobis distance naturally handles features
+            with different scales and accounts for correlations, making it more robust for real-world data.
+        </div>
+
+        <h2>Choosing the Right Distance Metric</h2>
+
+        <p>
+            The choice of distance metric can dramatically affect your algorithm's performance. Here's a practical
+            guide:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Distance Metric</th>
+                    <th>Best For</th>
+                    <th>Limitations</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Euclidean</strong></td>
+                    <td>Continuous features, spatial data</td>
+                    <td>Sensitive to scale, assumes independence</td>
+                </tr>
+                <tr>
+                    <td><strong>Manhattan</strong></td>
+                    <td>Grid-like data, high dimensions</td>
+                    <td>Ignores correlations</td>
+                </tr>
+                <tr>
+                    <td><strong>Cosine</strong></td>
+                    <td>Text, sparse data, direction matters</td>
+                    <td>Ignores magnitude</td>
+                </tr>
+                <tr>
+                    <td><strong>Hamming</strong></td>
+                    <td>Categorical/binary data</td>
+                    <td>Only for discrete data</td>
+                </tr>
+                <tr>
+                    <td><strong>Mahalanobis</strong></td>
+                    <td>Correlated features, anomaly detection</td>
+                    <td>Requires covariance matrix, computationally expensive</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Real-World Applications</h2>
+
+        <h3>K-Nearest Neighbors (KNN)</h3>
+
+        <p>
+            KNN classification relies entirely on distance measures to find the closest training examples to a new data
+            point.
+        </p>
+
+        <div class="animation-container">
+            <canvas id="knnCanvas" width="800" height="500"></canvas>
+            <p class="caption">KNN using different distance metrics produces different neighborhoods.</p>
+            <button class="control-button" onclick="animateKNN()">Replay Animation</button>
+        </div>
+
+        <h3>K-Means Clustering</h3>
+
+        <p>
+            K-means assigns points to clusters based on distance to cluster centroids. The choice of distance metric
+            affects the cluster shapes.
+        </p>
+
+        <div class="animation-container">
+            <canvas id="kmeansCanvas" width="800" height="500"></canvas>
+            <p class="caption">K-means clustering with Euclidean vs Manhattan distance.</p>
+            <button class="control-button" onclick="animateKMeans()">Replay Animation</button>
+        </div>
+
+        <h2>The Curse of Dimensionality</h2>
+
+        <p>
+            As dimensions increase, distance measures behave differently. In high-dimensional spaces, all points tend to
+            become equidistant, making distance-based algorithms less effective.
+        </p>
+
+        <div class="animation-container">
+            <canvas id="dimensionalityCanvas" width="800" height="400"></canvas>
+            <p class="caption">How distance distributions change as dimensionality increases.</p>
+            <button class="control-button" onclick="animateDimensionality()">Replay Animation</button>
+        </div>
+
+        <div class="warning-box">
+            <strong>Important:</strong> In high dimensions (>10 features), consider dimensionality reduction (PCA,
+            t-SNE) before applying distance-based algorithms, or use Manhattan distance which is more robust to high
+            dimensions.
+        </div>
+
+        <h2>Practical Tips</h2>
+
+        <div class="comparison-grid">
+            <div class="comparison-card">
+                <h4>Feature Scaling</h4>
+                <p>Always normalize or standardize features before using distance metrics (except Mahalanobis, which is
+                    scale-invariant).</p>
+            </div>
+            <div class="comparison-card">
+                <h4>Experiment</h4>
+                <p>Try multiple distance metrics with cross-validation to find what works best for your specific
+                    problem.</p>
+            </div>
+            <div class="comparison-card">
+                <h4>Domain Knowledge</h4>
+                <p>Consider what "similarity" means in your domain. For text, cosine is often better than Euclidean.</p>
+            </div>
+            <div class="comparison-card">
+                <h4>Computational Cost</h4>
+                <p>Manhattan is faster than Euclidean (no square root). Mahalanobis is most expensive.</p>
+            </div>
+        </div>
+
+        <h2>Conclusion</h2>
+
+        <p>
+            Distance measures are fundamental building blocks in machine learning. The right choice depends on your data
+            type, dimensionality, and what "similarity" means in your problem domain.
+        </p>
+
+        <p>
+            Key takeaways:
+        </p>
+
+        <ul>
+            <li>Euclidean distance is intuitive but requires feature scaling</li>
+            <li>Manhattan distance is more robust in high dimensions</li>
+            <li>Cosine similarity focuses on direction, not magnitude</li>
+            <li>Mahalanobis distance accounts for correlations and scale</li>
+            <li>Always experiment with multiple metrics</li>
+        </ul>
+
+        <div class="highlight-box">
+            <strong>Next Steps:</strong> Explore custom distance metrics tailored to your specific problem. Many
+            libraries (scikit-learn, scipy) allow you to define your own distance functions for specialized
+            applications.
+        </div>
+
+        <div
+            style="margin-top: 60px; padding-top: 30px; border-top: 1px solid #e2e8f0; color: #718096; text-align: center;">
+            <p>Thank you for reading! I hope these visualizations clarified how different distance measures work.</p>
+            <p>Understanding these fundamentals will help you make better choices in clustering, classification, and
+                beyond.</p>
+        </div>
+    </div>
+
+    <script>
+        // Animation 1: Triangle Inequality
+        function animateTriangleInequality() {
+            const canvas = document.getElementById('triangleInequalityCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const points = {
+                x: { x: 200, y: 300, label: 'X' },
+                y: { x: 600, y: 300, label: 'Y' },
+                z: { x: 400, y: 100, label: 'Z' }
+            };
+
+            let step = 0;
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw points
+                Object.values(points).forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 8, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#4299e1';
+                    ctx.fill();
+                    ctx.strokeStyle = '#2c5282';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = 'bold 18px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(p.label, p.x, p.y - 15);
+                });
+
+                // Draw edges based on step
+                if (step >= 1) {
+                    // X to Y (direct)
+                    ctx.beginPath();
+                    ctx.moveTo(points.x.x, points.x.y);
+                    ctx.lineTo(points.y.x, points.y.y);
+                    ctx.strokeStyle = '#48bb78';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    const midXY = { x: (points.x.x + points.y.x) / 2, y: (points.x.y + points.y.y) / 2 };
+                    ctx.fillStyle = '#48bb78';
+                    ctx.font = '14px sans-serif';
+                    ctx.fillText('d(X,Y)', midXY.x, midXY.y - 10);
+                }
+
+                if (step >= 2) {
+                    // X to Z
+                    ctx.beginPath();
+                    ctx.moveTo(points.x.x, points.x.y);
+                    ctx.lineTo(points.z.x, points.z.y);
+                    ctx.strokeStyle = '#f6ad55';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    const midXZ = { x: (points.x.x + points.z.x) / 2, y: (points.x.y + points.z.y) / 2 };
+                    ctx.fillStyle = '#f6ad55';
+                    ctx.fillText('d(X,Z)', midXZ.x - 30, midXZ.y);
+                }
+
+                if (step >= 3) {
+                    // Z to Y
+                    ctx.beginPath();
+                    ctx.moveTo(points.z.x, points.z.y);
+                    ctx.lineTo(points.y.x, points.y.y);
+                    ctx.strokeStyle = '#fc8181';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    const midZY = { x: (points.z.x + points.y.x) / 2, y: (points.z.y + points.y.y) / 2 };
+                    ctx.fillStyle = '#fc8181';
+                    ctx.fillText('d(Z,Y)', midZY.x + 30, midZY.y);
+                }
+
+                if (step >= 4) {
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = 'bold 16px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('d(X,Y) ≤ d(X,Z) + d(Z,Y)', 400, 370);
+                }
+
+                step++;
+                if (step <= 5) {
+                    setTimeout(animate, 1000);
+                }
+            };
+
+            animate();
+        }
+
+        // Animation 2: Euclidean Distance
+        function animateEuclidean() {
+            const canvas = document.getElementById('euclideanCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const p1 = { x: 150, y: 350 };
+            const p2 = { x: 650, y: 150 };
+
+            let progress = 0;
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw grid
+                ctx.strokeStyle = '#e2e8f0';
+                ctx.lineWidth = 1;
+                for (let i = 100; i < 700; i += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 100);
+                    ctx.lineTo(i, 400);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(100, i);
+                    ctx.lineTo(700, i);
+                    ctx.stroke();
+                }
+
+                // Draw axes
+                ctx.strokeStyle = '#cbd5e0';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(100, 400);
+                ctx.lineTo(700, 400);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(100, 400);
+                ctx.lineTo(100, 100);
+                ctx.stroke();
+
+                // Draw points
+                ctx.beginPath();
+                ctx.arc(p1.x, p1.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = '#4299e1';
+                ctx.fill();
+                ctx.strokeStyle = '#2c5282';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(p2.x, p2.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = '#f6ad55';
+                ctx.fill();
+                ctx.strokeStyle = '#dd6b20';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Labels
+                ctx.fillStyle = '#2d3748';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('P1', p1.x, p1.y - 20);
+                ctx.fillText('P2', p2.x, p2.y - 20);
+
+                // Animate line
+                if (progress <= 1) {
+                    const currentX = p1.x + (p2.x - p1.x) * progress;
+                    const currentY = p1.y + (p2.y - p1.y) * progress;
+
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(currentX, currentY);
+                    ctx.strokeStyle = '#48bb78';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    progress += 0.02;
+                    requestAnimationFrame(animate);
+                } else {
+                    // Draw final line
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = '#48bb78';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    // Show calculation
+                    const dx = Math.abs(p2.x - p1.x);
+                    const dy = Math.abs(p2.y - p1.y);
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    // Draw right triangle
+                    ctx.strokeStyle = '#cbd5e0';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = 'bold 16px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`Distance = √(${dx}² + ${dy}²) = ${dist.toFixed(1)} pixels`, 400, 450);
+                }
+            };
+
+            animate();
+        }
+
+        // Animation 3: Manhattan Distance
+        function animateManhattan() {
+            const canvas = document.getElementById('manhattanCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const p1 = { x: 150, y: 350 };
+            const p2 = { x: 650, y: 150 };
+
+            let step = 0;
+            let hProgress = 0;
+            let vProgress = 0;
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw grid
+                ctx.strokeStyle = '#e2e8f0';
+                ctx.lineWidth = 1;
+                for (let i = 100; i < 700; i += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 100);
+                    ctx.lineTo(i, 400);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(100, i);
+                    ctx.lineTo(700, i);
+                    ctx.stroke();
+                }
+
+                // Draw points
+                ctx.beginPath();
+                ctx.arc(p1.x, p1.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = '#4299e1';
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(p2.x, p2.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = '#f6ad55';
+                ctx.fill();
+
+                ctx.fillStyle = '#2d3748';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('P1', p1.x, p1.y - 20);
+                ctx.fillText('P2', p2.x, p2.y - 20);
+
+                // Animate horizontal movement
+                if (hProgress <= 1) {
+                    const currentX = p1.x + (p2.x - p1.x) * hProgress;
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(currentX, p1.y);
+                    ctx.strokeStyle = '#fc8181';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    hProgress += 0.02;
+                    requestAnimationFrame(animate);
+                } else if (vProgress <= 1) {
+                    // Draw complete horizontal
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p1.y);
+                    ctx.strokeStyle = '#fc8181';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    // Animate vertical
+                    const currentY = p1.y + (p2.y - p1.y) * vProgress;
+                    ctx.beginPath();
+                    ctx.moveTo(p2.x, p1.y);
+                    ctx.lineTo(p2.x, currentY);
+                    ctx.strokeStyle = '#fc8181';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    vProgress += 0.02;
+                    requestAnimationFrame(animate);
+                } else {
+                    // Final state
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = '#fc8181';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    const dx = Math.abs(p2.x - p1.x);
+                    const dy = Math.abs(p2.y - p1.y);
+
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = 'bold 16px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`Distance = |${dx}| + |${dy}| = ${dx + dy} pixels`, 400, 450);
+                }
+            };
+
+            animate();
+        }
+
+        // Animation 4: Euclidean vs Manhattan Comparison
+        function animateEucVsManhattan() {
+            const canvas = document.getElementById('eucVsManhattanCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const p1 = { x: 200, y: 350 };
+            const p2 = { x: 600, y: 150 };
+
+            let progress = 0;
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw grid
+                ctx.strokeStyle = '#e2e8f0';
+                ctx.lineWidth = 1;
+                for (let i = 150; i < 650; i += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 100);
+                    ctx.lineTo(i, 400);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(150, i);
+                    ctx.lineTo(650, i);
+                    ctx.stroke();
+                }
+
+                // Draw points
+                ctx.beginPath();
+                ctx.arc(p1.x, p1.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = '#4299e1';
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(p2.x, p2.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = '#f6ad55';
+                ctx.fill();
+
+                if (progress <= 1) {
+                    // Euclidean (diagonal)
+                    const eucX = p1.x + (p2.x - p1.x) * progress;
+                    const eucY = p1.y + (p2.y - p1.y) * progress;
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(eucX, eucY);
+                    ctx.strokeStyle = '#4299e1';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    // Manhattan (grid path)
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    if (progress < 0.5) {
+                        const manhX = p1.x + (p2.x - p1.x) * (progress * 2);
+                        ctx.lineTo(manhX, p1.y);
+                    } else {
+                        ctx.lineTo(p2.x, p1.y);
+                        const manhY = p1.y + (p2.y - p1.y) * ((progress - 0.5) * 2);
+                        ctx.lineTo(p2.x, manhY);
+                    }
+                    ctx.strokeStyle = '#fc8181';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    progress += 0.015;
+                    requestAnimationFrame(animate);
+                } else {
+                    // Final state
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = '#4299e1';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = '#fc8181';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+
+                    const dx = Math.abs(p2.x - p1.x);
+                    const dy = Math.abs(p2.y - p1.y);
+                    const eucDist = Math.sqrt(dx * dx + dy * dy);
+                    const manDist = dx + dy;
+
+                    ctx.fillStyle = '#4299e1';
+                    ctx.font = '14px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`Euclidean: ${eucDist.toFixed(1)}`, 400, 440);
+
+                    ctx.fillStyle = '#fc8181';
+                    ctx.fillText(`Manhattan: ${manDist.toFixed(1)}`, 400, 460);
+                }
+            };
+
+            animate();
+        }
+
+        // Animation 5: Minkowski Distance
+        function animateMinkowski() {
+            const canvas = document.getElementById('minkowskiCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const center = { x: 400, y: 250 };
+            const radius = 150;
+            let p = 1;
+            let increasing = true;
+
+            const drawMinkowskiCircle = (pValue) => {
+                ctx.beginPath();
+                const points = 200;
+                for (let i = 0; i <= points; i++) {
+                    const angle = (i / points) * 2 * Math.PI;
+                    const x = Math.cos(angle);
+                    const y = Math.sin(angle);
+
+                    const r = Math.pow(Math.pow(Math.abs(x), pValue) + Math.pow(Math.abs(y), pValue), -1 / pValue);
+                    const px = center.x + radius * r * x;
+                    const py = center.y + radius * r * y;
+
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = '#4299e1';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            };
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw axes
+                ctx.strokeStyle = '#cbd5e0';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(center.x, center.y - 200);
+                ctx.lineTo(center.x, center.y + 200);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(center.x - 200, center.y);
+                ctx.lineTo(center.x + 200, center.y);
+                ctx.stroke();
+
+                // Draw center point
+                ctx.beginPath();
+                ctx.arc(center.x, center.y, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = '#fc8181';
+                ctx.fill();
+
+                // Draw Minkowski "circle"
+                drawMinkowskiCircle(p);
+
+                // Show p value
+                ctx.fillStyle = '#2d3748';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`p = ${p.toFixed(1)}`, 400, 50);
+
+                ctx.font = '14px sans-serif';
+                if (p === 1) ctx.fillText('(Manhattan Distance)', 400, 75);
+                else if (Math.abs(p - 2) < 0.1) ctx.fillText('(Euclidean Distance)', 400, 75);
+                else if (p >= 10) ctx.fillText('(Approaching Chebyshev)', 400, 75);
+
+                // Animate p
+                if (increasing) {
+                    p += 0.05;
+                    if (p >= 10) increasing = false;
+                } else {
+                    p -= 0.05;
+                    if (p <= 1) increasing = true;
+                }
+
+                requestAnimationFrame(animate);
+            };
+
+            animate();
+        }
+
+        // Animation 6: Cosine Similarity
+        function animateCosine() {
+            const canvas = document.getElementById('cosineCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const origin = { x: 100, y: 400 };
+            const v1 = { x: 300, y: 100 };
+            const v2Start = { x: 400, y: 100 };
+
+            let angle = 0;
+            let increasing = true;
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw axes
+                ctx.strokeStyle = '#cbd5e0';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(origin.x, origin.y);
+                ctx.lineTo(origin.x + 600, origin.y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(origin.x, origin.y);
+                ctx.lineTo(origin.x, origin.y - 350);
+                ctx.stroke();
+
+                // Calculate v2 position based on angle
+                const v2Length = 350;
+                const v2 = {
+                    x: origin.x + v2Length * Math.cos(angle),
+                    y: origin.y - v2Length * Math.sin(angle)
+                };
+
+                // Draw vectors
+                ctx.beginPath();
+                ctx.moveTo(origin.x, origin.y);
+                ctx.lineTo(v1.x, v1.y);
+                ctx.strokeStyle = '#4299e1';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                // Arrow for v1
+                const angle1 = Math.atan2(v1.y - origin.y, v1.x - origin.x);
+                ctx.save();
+                ctx.translate(v1.x, v1.y);
+                ctx.rotate(angle1);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-15, -8);
+                ctx.lineTo(-15, 8);
+                ctx.closePath();
+                ctx.fillStyle = '#4299e1';
+                ctx.fill();
+                ctx.restore();
+
+                ctx.beginPath();
+                ctx.moveTo(origin.x, origin.y);
+                ctx.lineTo(v2.x, v2.y);
+                ctx.strokeStyle = '#f6ad55';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                // Arrow for v2
+                ctx.save();
+                ctx.translate(v2.x, v2.y);
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-15, -8);
+                ctx.lineTo(-15, 8);
+                ctx.closePath();
+                ctx.fillStyle = '#f6ad55';
+                ctx.fill();
+                ctx.restore();
+
+                // Draw angle arc
+                ctx.beginPath();
+                const arcRadius = 80;
+                const startAngle = Math.atan2(v1.y - origin.y, v1.x - origin.x);
+                ctx.arc(origin.x, origin.y, arcRadius, -angle, -startAngle, angle > startAngle);
+                ctx.strokeStyle = '#48bb78';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Calculate cosine similarity
+                const cosine = Math.cos(Math.abs(angle - startAngle));
+
+                // Display info
+                ctx.fillStyle = '#2d3748';
+                ctx.font = 'bold 18px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText('Vector 1', v1.x + 10, v1.y);
+                ctx.fillText('Vector 2', v2.x + 10, v2.y - 10);
+
+                ctx.font = 'bold 20px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`Angle: ${(Math.abs(angle - startAngle) * 180 / Math.PI).toFixed(1)}°`, 400, 50);
+                ctx.fillText(`Cosine Similarity: ${cosine.toFixed(3)}`, 400, 480);
+
+                // Animate angle
+                if (increasing) {
+                    angle += 0.01;
+                    if (angle >= Math.PI * 0.8) increasing = false;
+                } else {
+                    angle -= 0.01;
+                    if (angle <= 0) increasing = true;
+                }
+
+                requestAnimationFrame(animate);
+            };
+
+            animate();
+        }
+
+        // Animation 7: Hamming Distance
+        function animateHamming() {
+            const canvas = document.getElementById('hammingCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const str1 = 'ALGORITHM';
+            const str2 = 'ALGARITHM';
+            const startX = 150;
+            const startY = 150;
+            const boxSize = 60;
+            const gap = 10;
+
+            let step = 0;
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw labels
+                ctx.fillStyle = '#2d3748';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText('String 1:', 50, startY + 30);
+                ctx.fillText('String 2:', 50, startY + 120);
+
+                // Draw string 1
+                for (let i = 0; i < str1.length; i++) {
+                    const x = startX + i * (boxSize + gap);
+
+                    ctx.fillStyle = i < step && str1[i] !== str2[i] ? '#fc8181' : '#e2e8f0';
+                    ctx.fillRect(x, startY, boxSize, boxSize);
+                    ctx.strokeStyle = '#cbd5e0';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, startY, boxSize, boxSize);
+
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = 'bold 24px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(str1[i], x + boxSize / 2, startY + 40);
+                }
+
+                // Draw string 2
+                for (let i = 0; i < str2.length; i++) {
+                    const x = startX + i * (boxSize + gap);
+
+                    ctx.fillStyle = i < step && str1[i] !== str2[i] ? '#fc8181' : '#e2e8f0';
+                    ctx.fillRect(x, startY + 90, boxSize, boxSize);
+                    ctx.strokeStyle = '#cbd5e0';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, startY + 90, boxSize, boxSize);
+
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = 'bold 24px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(str2[i], x + boxSize / 2, startY + 130);
+                }
+
+                // Draw comparison lines
+                for (let i = 0; i < Math.min(step, str1.length); i++) {
+                    const x = startX + i * (boxSize + gap) + boxSize / 2;
+
+                    if (str1[i] === str2[i]) {
+                        ctx.strokeStyle = '#48bb78';
+                        ctx.lineWidth = 3;
+                    } else {
+                        ctx.strokeStyle = '#fc8181';
+                        ctx.lineWidth = 4;
+                    }
+
+                    ctx.beginPath();
+                    ctx.moveTo(x, startY + boxSize + 5);
+                    ctx.lineTo(x, startY + 85);
+                    ctx.stroke();
+
+                    if (str1[i] !== str2[i]) {
+                        // Draw X
+                        ctx.beginPath();
+                        ctx.moveTo(x - 8, startY + boxSize + 15);
+                        ctx.lineTo(x + 8, startY + 75);
+                        ctx.moveTo(x + 8, startY + boxSize + 15);
+                        ctx.lineTo(x - 8, startY + 75);
+                        ctx.stroke();
+                    } else {
+                        // Draw checkmark
+                        ctx.beginPath();
+                        ctx.moveTo(x - 8, startY + boxSize + 35);
+                        ctx.lineTo(x - 3, startY + boxSize + 42);
+                        ctx.lineTo(x + 8, startY + boxSize + 20);
+                        ctx.stroke();
+                    }
+                }
+
+                if (step >= str1.length) {
+                    const differences = str1.split('').filter((c, i) => c !== str2[i]).length;
+                    ctx.fillStyle = '#2d3748';
+                    ctx.font = 'bold 20px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`Hamming Distance = ${differences}`, 400, 300);
+                }
+
+                step++;
+                if (step <= str1.length + 1) {
+                    setTimeout(animate, 600);
+                }
+            };
+
+            animate();
+        }
+
+        // Animation 8: Mahalanobis Distance
+        function animateMahalanobis() {
+            const canvas = document.getElementById('mahalanobisCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const center = { x: 400, y: 250 };
+            let angle = 0;
+
+            const drawEllipse = (cx, cy, rx, ry, rotation, color) => {
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(rotation);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, rx, ry, 0, 0, 2 * Math.PI);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            };
+
+            const drawPoint = (x, y, label, color) => {
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = '#2d3748';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#2d3748';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(label, x, y - 15);
+            };
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw data distribution ellipses (covariance contours)
+                drawEllipse(center.x, center.y, 150, 80, Math.PI / 6, '#cbd5e0');
+                drawEllipse(center.x, center.y, 100, 53, Math.PI / 6, '#cbd5e0');
+                drawEllipse(center.x, center.y, 50, 27, Math.PI / 6, '#cbd5e0');
+
+                // Draw center
+                drawPoint(center.x, center.y, 'μ (mean)', '#fc8181');
+
+                // Test points
+                const p1 = {
+                    x: center.x + 120 * Math.cos(angle),
+                    y: center.y + 60 * Math.sin(angle)
+                };
+                const p2 = {
+                    x: center.x + 80,
+                    y: center.y + 80
+                };
+
+                // Draw Euclidean distances
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = '#90cdf4';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(center.x, center.y);
+                ctx.lineTo(p1.x, p1.y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(center.x, center.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                drawPoint(p1.x, p1.y, 'P1', '#4299e1');
+                drawPoint(p2.x, p2.y, 'P2', '#f6ad55');
+
+                // Calculate distances
+                const eucDist1 = Math.sqrt(Math.pow(p1.x - center.x, 2) + Math.pow(p1.y - center.y, 2));
+                const eucDist2 = Math.sqrt(Math.pow(p2.x - center.x, 2) + Math.pow(p2.y - center.y, 2));
+
+                // Simplified Mahalanobis (approximate)
+                const mahDist1 = Math.sqrt(
+                    Math.pow((p1.x - center.x) / 150, 2) +
+                    Math.pow((p1.y - center.y) / 80, 2)
+                ) * 150;
+                const mahDist2 = Math.sqrt(
+                    Math.pow((p2.x - center.x) / 150, 2) +
+                    Math.pow((p2.y - center.y) / 80, 2)
+                ) * 150;
+
+                // Display info
+                ctx.fillStyle = '#2d3748';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText('Euclidean Distances:', 50, 50);
+                ctx.fillStyle = '#4299e1';
+                ctx.fillText(`P1: ${eucDist1.toFixed(1)}`, 50, 70);
+                ctx.fillStyle = '#f6ad55';
+                ctx.fillText(`P2: ${eucDist2.toFixed(1)}`, 50, 90);
+
+                ctx.fillStyle = '#2d3748';
+                ctx.fillText('Mahalanobis Distances:', 50, 120);
+                ctx.fillStyle = '#4299e1';
+                ctx.fillText(`P1: ${mahDist1.toFixed(1)}`, 50, 140);
+                ctx.fillStyle = '#f6ad55';
+                ctx.fillText(`P2: ${mahDist2.toFixed(1)}`, 50, 160);
+
+                ctx.fillStyle = '#718096';
+                ctx.font = '12px sans-serif';
+                ctx.fillText('Ellipses show data distribution', 50, 190);
+                ctx.fillText('(Mahalanobis accounts for this)', 50, 205);
+
+                angle += 0.02;
+                requestAnimationFrame(animate);
+            };
+
+            animate();
+        }
+
+        // Animation 9: KNN
+        function animateKNN() {
+            const canvas = document.getElementById('knnCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            // Generate random points
+            const bluePoints = [];
+            const redPoints = [];
+            for (let i = 0; i < 20; i++) {
+                bluePoints.push({
+                    x: 200 + Math.random() * 200,
+                    y: 150 + Math.random() * 200
+                });
+                redPoints.push({
+                    x: 400 + Math.random() * 200,
+                    y: 150 + Math.random() * 200
+                });
+            }
+
+            const testPoint = { x: 400, y: 250 };
+            let radius = 0;
+            let maxRadius = 150;
+            let growing = true;
+
+            const animate = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw training points
+                bluePoints.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#4299e1';
+                    ctx.fill();
+                });
+
+                redPoints.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#fc8181';
+                    ctx.fill();
+                });
+
+                // Draw search radius
+                ctx.beginPath();
+                ctx.arc(testPoint.x, testPoint.y, radius, 0, 2 * Math.PI);
+                ctx.strokeStyle = '#48bb78';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Draw test point
+                ctx.beginPath();
+                ctx.arc(testPoint.x, testPoint.y, 8, 0, 2 * Math.PI);
+                ctx.fillStyle = '#f6ad55';
+                ctx.fill();
+                ctx.strokeStyle = '#2d3748';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                if (growing) {
+                    radius += 1;
+                    if (radius > maxRadius) growing = false;
+                } else {
+                    radius = 0;
+                    growing = true;
+                }
+
+                requestAnimationFrame(animate);
+            };
+
+            animate();
+        }
+
+        function animateKMeans() {
+            const canvas = document.getElementById('kmeansCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = "20px Arial";
+            ctx.fillStyle = "black";
+            ctx.textAlign = "center";
+            ctx.fillText("Animation placeholder", canvas.width / 2, canvas.height / 2);
+        }
+
+        function animateDimensionality() {
+            const canvas = document.getElementById('dimensionalityCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = "20px Arial";
+            ctx.fillStyle = "black";
+            ctx.textAlign = "center";
+            ctx.fillText("Animation placeholder", canvas.width / 2, canvas.height / 2);
+        }
+    </script>
+</body>
+
+</html>

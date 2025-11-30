@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Renaissance of Analog AI Chips</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <a href="index.html" class="back-button">← Back to Blog</a>
+        <div class="article-header-row">
+            <div class="article-header-text">
+                <h1>The Renaissance of Analog AI Chips</h1>
+            </div>
+            <img src="assets/images/analog-banner.png" alt="Analog AI Chip Banner" class="article-banner-side">
+        </div>
+
+        <p class="intro">
+            As artificial intelligence models grow exponentially in size, the energy demands of digital computing are
+            becoming unsustainable. Enter Analog AI chips—a "back to the future" approach that leverages the physics of
+            continuous signals to perform massive computations with a fraction of the power.
+        </p>
+
+        <p>
+            While the digital revolution has been driven by the precision of 0s and 1s, the human brain—the ultimate
+            intelligent machine—operates on continuous, analog principles. Analog AI aims to bridge this gap, offering a
+            pathway to sustainable, high-performance AI.
+        </p>
+
+        <h2>Digital vs. Analog: A Fundamental Shift</h2>
+
+        <p>
+            Digital computers process information using discrete binary values. To perform a simple multiplication, a
+            digital processor must fetch data from memory, move it to the arithmetic logic unit (ALU), perform the
+            calculation using thousands of transistors switching on and off, and then write the result back to memory.
+            This movement of data, known as the <em>von Neumann bottleneck</em>, is where most energy is consumed.
+        </p>
+
+        <p>
+            Analog chips, in contrast, represent data as continuous physical quantities like voltage or current. They
+            can perform calculations using the physical properties of the circuit components themselves.
+        </p>
+
+        <div class="highlight-box">
+            <strong>Key Concept:</strong> In an analog circuit, Ohm's Law (\(V = I \cdot R\)) and Kirchhoff's Current
+            Law naturally perform multiplication and addition—the two core operations of neural networks.
+        </div>
+
+        <h2>In-Memory Computing</h2>
+
+        <p>
+            The killer feature of analog AI is <strong>In-Memory Computing</strong>. Instead of separating memory and
+            processing, analog chips perform computations <em>inside</em> the memory array.
+        </p>
+
+        <p>
+            Imagine a grid of resistors (or memristors). If we apply input voltages (\(V\)) to the rows and set the
+            conductance (\(G = 1/R\)) of the resistors to represent the weights of a neural network, the current flowing
+            through each resistor is \(I = V \cdot G\) (multiplication).
+        </p>
+
+        <p>
+            The currents from all resistors in a column naturally sum up (\(I_{total} = \sum I\)) according to
+            Kirchhoff's Current Law. This allows an entire matrix multiplication—the heavy lifting of deep learning—to
+            be performed in a single step, at the speed of light, without moving data.
+        </p>
+
+        <div class="math-block">
+            <p>\[ I_{out} = \sum_{i} V_{in, i} \cdot G_{i} \]</p>
+            <p>This single physical step replaces thousands of digital clock cycles.</p>
+        </div>
+
+        <div class="animation-container">
+            <canvas id="crossbarCanvas" width="800" height="400"></canvas>
+            <p class="caption">Analog Matrix Multiplication: Voltages (Inputs) × Conductances (Weights) = Currents
+                (Outputs)</p>
+            <button class="control-button" onclick="animateCrossbar()">Replay Animation</button>
+        </div>
+
+        <script>
+            function animateCrossbar() {
+                const canvas = document.getElementById('crossbarCanvas');
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const inputs = [0.8, 0.2, 0.6]; // Input voltages
+                const weights = [
+                    [0.5, 0.9, 0.2],
+                    [0.3, 0.1, 0.8],
+                    [0.7, 0.4, 0.5]
+                ]; // Conductance matrix
+
+                // Layout
+                const startX = 150;
+                const startY = 100;
+                const spacing = 80;
+
+                let step = 0;
+
+                const draw = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw Input Lines (Rows)
+                    inputs.forEach((val, i) => {
+                        const y = startY + i * spacing;
+
+                        // Input Label
+                        ctx.fillStyle = '#2d3748';
+                        ctx.font = '14px sans-serif';
+                        ctx.textAlign = 'right';
+                        ctx.fillText(`V${i}=${val}`, startX - 20, y + 5);
+
+                        // Line
+                        ctx.beginPath();
+                        ctx.moveTo(startX, y);
+                        ctx.lineTo(startX + 3 * spacing, y);
+                        ctx.strokeStyle = step >= 1 ? '#4299e1' : '#cbd5e0';
+                        ctx.lineWidth = 3;
+                        ctx.stroke();
+                    });
+
+                    // Draw Output Lines (Columns)
+                    for (let j = 0; j < 3; j++) {
+                        const x = startX + j * spacing + 40;
+
+                        // Line
+                        ctx.beginPath();
+                        ctx.moveTo(x, startY - 20);
+                        ctx.lineTo(x, startY + 2 * spacing + 40);
+                        ctx.strokeStyle = step >= 3 ? '#f6ad55' : '#cbd5e0';
+                        ctx.lineWidth = 3;
+                        ctx.stroke();
+
+                        // Output Label
+                        if (step >= 3) {
+                            let sum = 0;
+                            for (let i = 0; i < 3; i++) sum += inputs[i] * weights[i][j];
+
+                            ctx.fillStyle = '#2d3748';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(`I${j}=${sum.toFixed(2)}`, x, startY + 2 * spacing + 60);
+                        }
+                    }
+
+                    // Draw Resistors (Weights)
+                    for (let i = 0; i < 3; i++) {
+                        for (let j = 0; j < 3; j++) {
+                            const x = startX + j * spacing + 40;
+                            const y = startY + i * spacing;
+
+                            ctx.beginPath();
+                            ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                            ctx.fillStyle = step >= 2 ? '#48bb78' : '#cbd5e0';
+                            ctx.fill();
+
+                            // Weight Label
+                            ctx.fillStyle = '#718096';
+                            ctx.font = '10px sans-serif';
+                            ctx.fillText(weights[i][j], x + 10, y - 10);
+                        }
+                    }
+
+                    // Animation Steps
+                    if (step === 0) {
+                        ctx.fillStyle = '#2d3748';
+                        ctx.font = 'bold 16px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText("1. Apply Input Voltages", 400, 50);
+                    } else if (step === 1) {
+                        ctx.fillText("2. Current flows through resistors (Ohm's Law)", 400, 50);
+                    } else if (step === 2) {
+                        ctx.fillText("3. Currents sum along columns (Kirchhoff's Law)", 400, 50);
+                    } else {
+                        ctx.fillText("Result: Matrix Multiplication Complete!", 400, 50);
+                    }
+
+                    step++;
+                    if (step <= 4) setTimeout(draw, 1500);
+                };
+
+                draw();
+            }
+
+            // Auto-start
+            setTimeout(animateCrossbar, 1000);
+        </script>
+
+        <h2>Analog Logic: The OR Gate</h2>
+
+        <p>
+            Analog circuits aren't just for matrix multiplication; they can also implement fundamental logic gates.
+            Consider the <strong>OR gate</strong>, a building block of digital logic.
+        </p>
+
+        <p>
+            In the analog world, a simple OR gate can be built using <strong>diodes</strong>. A diode is like a one-way
+            valve for electricity.
+        </p>
+
+        <div class="highlight-box">
+            <strong>How it works:</strong> Connect two inputs (A and B) to the anode (positive side) of two separate
+            diodes. Connect their cathodes (negative side) together to a resistor and then to ground. The voltage at the
+            junction is the output.
+        </div>
+
+        <ul>
+            <li>If <strong>Input A</strong> is high (e.g., 5V), current flows through diode A to the output. Output is
+                High (~4.3V due to diode drop).</li>
+            <li>If <strong>Input B</strong> is high, current flows through diode B. Output is High.</li>
+            <li>If <strong>Both</strong> are high, current flows through both. Output is High.</li>
+            <li>Only if <strong>Both</strong> are low (0V) is the output Low (0V).</li>
+        </ul>
+
+        <div class="animation-container">
+            <svg width="400" height="200" viewBox="0 0 400 200"
+                style="margin: 0 auto; display: block; background: white; border: 1px solid #e2e8f0; border-radius: 8px;">
+                <!-- Input A -->
+                <text x="50" y="60" font-family="sans-serif" font-size="14">A</text>
+                <line x1="70" y1="55" x2="120" y2="55" stroke="black" stroke-width="2" />
+                <!-- Diode A -->
+                <polygon points="120,45 120,65 140,55" fill="#4299e1" stroke="black" />
+                <line x1="140" y1="45" x2="140" y2="65" stroke="black" stroke-width="2" />
+                <line x1="140" y1="55" x2="180" y2="55" stroke="black" stroke-width="2" />
+
+                <!-- Input B -->
+                <text x="50" y="140" font-family="sans-serif" font-size="14">B</text>
+                <line x1="70" y1="135" x2="120" y2="135" stroke="black" stroke-width="2" />
+                <!-- Diode B -->
+                <polygon points="120,125 120,145 140,135" fill="#4299e1" stroke="black" />
+                <line x1="140" y1="125" x2="140" y2="145" stroke="black" stroke-width="2" />
+                <line x1="140" y1="135" x2="180" y2="135" stroke="black" stroke-width="2" />
+
+                <!-- Junction -->
+                <line x1="180" y1="55" x2="180" y2="135" stroke="black" stroke-width="2" />
+                <line x1="180" y1="95" x2="250" y2="95" stroke="black" stroke-width="2" />
+
+                <!-- Resistor -->
+                <polyline points="250,95 255,85 265,105 275,85 285,105 290,95" fill="none" stroke="black"
+                    stroke-width="2" />
+                <line x1="290" y1="95" x2="320" y2="95" stroke="black" stroke-width="2" />
+
+                <!-- Ground -->
+                <line x1="270" y1="105" x2="270" y2="140" stroke="black" stroke-width="2" />
+                <line x1="260" y1="140" x2="280" y2="140" stroke="black" stroke-width="2" />
+                <line x1="265" y1="145" x2="275" y2="145" stroke="black" stroke-width="2" />
+
+                <!-- Output -->
+                <text x="330" y="100" font-family="sans-serif" font-size="14">Output (Y)</text>
+            </svg>
+            <p class="caption">A simple Diode OR Gate circuit diagram.</p>
+        </div>
+
+        <h2>Analog Linear Regression</h2>
+
+        <p>
+            Linear regression fits a line \(y = mx + c\) to data. In neural networks, this generalizes to \(y = \sum w_i
+            x_i + b\).
+        </p>
+
+        <p>
+            We can implement this equation directly using an <strong>Operational Amplifier (Op-Amp) Summing
+                Amplifier</strong>.
+        </p>
+
+        <div class="math-block">
+            <p>\[ V_{out} = -R_f \left( \frac{V_1}{R_1} + \frac{V_2}{R_2} + \dots \right) \]</p>
+        </div>
+
+        <p>
+            Here:
+        </p>
+        <ul>
+            <li>\(V_1, V_2, \dots\) are the input features (\(x_i\)).</li>
+            <li>The ratios \(R_f/R_i\) determine the weights (\(w_i\)).</li>
+            <li>By adjusting the resistor values, we "train" the model.</li>
+        </ul>
+
+        <p>
+            This circuit performs the weighted sum instantaneously. To get the exact linear regression form, we might
+            add an inverting stage (to cancel the negative sign) and a bias voltage. This is the fundamental hardware
+            unit of an analog neural network!
+        </p>
+
+        <h2>Why It Matters: Efficiency and Speed</h2>
+
+        <p>
+            The benefits of this approach are transformative:
+        </p>
+
+        <ul>
+            <li><strong>Energy Efficiency:</strong> Analog chips can be 100x to 1000x more energy-efficient than digital
+                GPUs for specific inference tasks. This is crucial for running AI on battery-powered edge devices.</li>
+            <li><strong>Speed:</strong> By performing massive parallel operations in the analog domain, these chips can
+                achieve incredibly low latency.</li>
+            <li><strong>Density:</strong> Analog memory cells can be much smaller than digital logic circuits, allowing
+                for higher density of compute per square millimeter.</li>
+        </ul>
+
+        <h2>Challenges and the Future</h2>
+
+        <p>
+            If analog is so good, why aren't we using it everywhere? Analog computing comes with its own set of
+            challenges:
+        </p>
+
+        <ul>
+            <li><strong>Noise and Precision:</strong> Analog signals are susceptible to noise, temperature changes, and
+                manufacturing variations. Achieving the high precision required for training deep networks is difficult
+                (though inference is more forgiving).</li>
+            <li><strong>The Analog-Digital Interface:</strong> Converting data between the digital world (our cameras,
+                computers) and the analog chip (ADCs and DACs) consumes power and area.</li>
+        </ul>
+
+        <p>
+            Despite these hurdles, the potential is undeniable. Companies like IBM, Mythic, and various startups are
+            racing to commercialize analog AI accelerators. As we push the boundaries of what AI can do, analog hardware
+            might just be the key to making it sustainable.
+        </p>
+
+        <div class="footer">
+            <p>Published on November 26, 2025</p>
+        </div>
+    </div>
+</body>
+
+</html>
