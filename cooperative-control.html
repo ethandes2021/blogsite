@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cooperative Control and Synchronization of Multi-Agent Robotic Systems</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <a href="index.html" class="back-button">← Back to Blog</a>
+        <div class="article-header-row">
+            <div class="article-header-text">
+                <h1>Cooperative Control and Synchronization of Multi-Agent Robotic Systems</h1>
+                <div class="article-meta">November 2025 • Robotics</div>
+            </div>
+            <img src="assets/images/cooperative-control-banner.png" alt="Cooperative Control Banner"
+                class="article-banner-side">
+        </div>
+
+        <p class="intro">
+            How do birds flock without a leader? How can hundreds of drones create complex light shows in perfect sync?
+            The answer lies in <strong>Cooperative Control</strong>. By following simple local rules, massive groups of
+            autonomous agents can achieve complex global behaviors.
+        </p>
+
+        <p>
+            In this article, we'll explore the mathematics of consensus, synchronization, and flocking, and see how
+            these biological principles are being applied to next-generation robotics.
+        </p>
+
+        <h2>The Power of Local Interactions</h2>
+
+        <p>
+            In a multi-agent system, no single agent has a global view. Instead, each agent communicates only with its
+            nearest neighbors. The challenge is to design local control laws that guarantee the entire group reaches a
+            common state (consensus) or moves in a coordinated formation (synchronization).
+        </p>
+
+        <div class="highlight-box">
+            <strong>Consensus Protocol:</strong> The simplest continuous-time consensus algorithm for an agent \(i\)
+            with state \(x_i\) is:
+            $$ \dot{x}_i = \sum_{j \in N_i} (x_j - x_i) $$
+            where \(N_i\) is the set of neighbors of agent \(i\). This simple rule ensures all agents converge to the
+            average of their initial states.
+        </div>
+
+        <h2>Flocking: Reynolds' Boids</h2>
+
+        <p>
+            One of the most visually striking examples of cooperative control is flocking. In 1986, Craig Reynolds
+            introduced three simple rules that simulate realistic flocking behavior:
+        </p>
+
+        <ul>
+            <li><strong>Separation:</strong> Steer to avoid crowding local flockmates.</li>
+            <li><strong>Alignment:</strong> Steer towards the average heading of local flockmates.</li>
+            <li><strong>Cohesion:</strong> Steer to move towards the average position (center of mass) of local
+                flockmates.</li>
+        </ul>
+
+        <div class="animation-container">
+            <canvas id="flockingCanvas" width="800" height="400"></canvas>
+            <div class="controls">
+                <button class="control-button" onclick="resetFlock()">Reset Flock</button>
+            </div>
+            <p class="caption">Interactive Flocking Simulation: Agents align their velocity and stay cohesive while
+                avoiding collisions.</p>
+        </div>
+
+        <h3>How It Works: The Algorithm</h3>
+        <p>
+            The behavior you see above emerges from the following simple logic, executed by every agent at every time
+            step:
+        </p>
+
+        <div class="highlight-box">
+            <pre><code class="language-python">
+for each boid in flock:
+    # 1. Separation: Avoid crowding neighbors
+    separation_vector = sum(vector_away_from(neighbor) for neighbor in close_neighbors)
+
+    # 2. Alignment: Steer towards average heading
+    alignment_vector = average_velocity(neighbors) - boid.velocity
+
+    # 3. Cohesion: Steer towards center of mass
+    cohesion_vector = center_of_mass(neighbors) - boid.position
+
+    # Update velocity
+    boid.velocity += (separation_vector * w_sep) + 
+                     (alignment_vector * w_align) + 
+                     (cohesion_vector * w_coh)
+    
+    # Limit speed
+    boid.velocity = limit_magnitude(boid.velocity, max_speed)
+            </code></pre>
+        </div>
+
+        <p>
+            By tuning the weights (<code>w_sep</code>, <code>w_align</code>, <code>w_coh</code>), we can simulate
+            different
+            types of flocking behavior, from tight schools of fish to loose formations of birds.
+        </p>
+
+        <h2>Applications in Robotics</h2>
+
+        <p>
+            These principles are transforming robotics. From <strong>warehouse logistics</strong> where swarms of robots
+            move goods without collision, to <strong>environmental monitoring</strong> where sensor networks cover vast
+            areas, cooperative control enables robust, scalable systems that are resilient to the failure of individual
+            agents.
+        </p>
+
+        <h2>References</h2>
+        <ul style="font-size: 0.9em; color: #4a5568;">
+            <li>[1] Olfati-Saber, R., Fax, J. A., & Murray, R. M. (2007). <a href="#">Consensus and cooperation in
+                    networked multi-agent systems</a>. Proceedings of the IEEE.</li>
+            <li>[2] Reynolds, C. W. (1987). <a href="#">Flocks, herds and schools: A distributed behavioral model</a>.
+                SIGGRAPH '87.</li>
+            <li>[3] Ren, W., & Beard, R. W. (2008). <a href="#">Distributed Consensus in Multi-vehicle Cooperative
+                    Control</a>. Springer.</li>
+            <li>[4] Oh, K. K., Park, M. C., & Ahn, H. S. (2015). <a href="#">A survey of multi-agent formation
+                    control</a>. Automatica.</li>
+        </ul>
+
+        <div class="footer">
+            <p>Published on November 30, 2025</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('flockingCanvas');
+        const ctx = canvas.getContext('2d');
+        let boids = [];
+        const numBoids = 50;
+        const visualRange = 75;
+
+        class Boid {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.dx = Math.random() * 4 - 2;
+                this.dy = Math.random() * 4 - 2;
+                this.history = [];
+            }
+
+            update() {
+                // Simple flocking rules
+                let xAvg = 0, yAvg = 0, dxAvg = 0, dyAvg = 0, neighboringBoids = 0;
+                let closeDx = 0, closeDy = 0;
+
+                for (let other of boids) {
+                    let dist = Math.hypot(this.x - other.x, this.y - other.y);
+                    if (other !== this && dist < visualRange) {
+                        xAvg += other.x;
+                        yAvg += other.y;
+                        dxAvg += other.dx;
+                        dyAvg += other.dy;
+                        neighboringBoids++;
+
+                        // Separation
+                        if (dist < 20) {
+                            closeDx += this.x - other.x;
+                            closeDy += this.y - other.y;
+                        }
+                    }
+                }
+
+                if (neighboringBoids > 0) {
+                    // Cohesion
+                    xAvg = xAvg / neighboringBoids;
+                    yAvg = yAvg / neighboringBoids;
+                    this.dx += (xAvg - this.x) * 0.005;
+                    this.dy += (yAvg - this.y) * 0.005;
+
+                    // Alignment
+                    dxAvg = dxAvg / neighboringBoids;
+                    dyAvg = dyAvg / neighboringBoids;
+                    this.dx += (dxAvg - this.dx) * 0.05;
+                    this.dy += (dyAvg - this.dy) * 0.05;
+                }
+
+                this.dx += closeDx * 0.05;
+                this.dy += closeDy * 0.05;
+
+                // Speed limit
+                const speed = Math.hypot(this.dx, this.dy);
+                if (speed > 3) {
+                    this.dx = (this.dx / speed) * 3;
+                    this.dy = (this.dy / speed) * 3;
+                }
+
+                // Keep within bounds
+                const margin = 50;
+                if (this.x < margin) this.dx += 0.1;
+                if (this.x > canvas.width - margin) this.dx -= 0.1;
+                if (this.y < margin) this.dy += 0.1;
+                if (this.y > canvas.height - margin) this.dy -= 0.1;
+
+                this.x += this.dx;
+                this.y += this.dy;
+
+                // Trail
+                this.history.push({ x: this.x, y: this.y });
+                if (this.history.length > 10) this.history.shift();
+            }
+
+            draw() {
+                // Draw trail
+                ctx.beginPath();
+                for (let i = 0; i < this.history.length; i++) {
+                    ctx.lineTo(this.history[i].x, this.history[i].y);
+                }
+                ctx.strokeStyle = `rgba(66, 153, 225, 0.3)`;
+                ctx.stroke();
+
+                // Draw boid
+                const angle = Math.atan2(this.dy, this.dx);
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.moveTo(6, 0);
+                ctx.lineTo(-4, 3);
+                ctx.lineTo(-4, -3);
+                ctx.closePath();
+                ctx.fillStyle = '#4299e1';
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function init() {
+            boids = [];
+            for (let i = 0; i < numBoids; i++) {
+                boids.push(new Boid());
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let boid of boids) {
+                boid.update();
+                boid.draw();
+            }
+            requestAnimationFrame(animate);
+        }
+
+        function resetFlock() {
+            init();
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+
+</html>
