@@ -183,11 +183,15 @@
         </p>
 
         <!-- Visual: the spike problem -->
-        <div style="background:#f7fafc; border:1px solid #e2e8f0; border-radius:10px; padding:20px 24px; margin:24px 0;">
-            <div style="font-size:12px; font-weight:700; color:#718096; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:12px;">Why naive quantization breaks</div>
+        <div
+            style="background:#f7fafc; border:1px solid #e2e8f0; border-radius:10px; padding:20px 24px; margin:24px 0;">
+            <div
+                style="font-size:12px; font-weight:700; color:#718096; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:12px;">
+                Why naive quantization breaks</div>
             <div style="display:flex; gap:32px; align-items:flex-end; flex-wrap:wrap;">
                 <div style="flex:1; min-width:200px;">
-                    <div style="font-size:12px; color:#4a5568; margin-bottom:8px; font-weight:600;">Original vector — spiky, uneven</div>
+                    <div style="font-size:12px; color:#4a5568; margin-bottom:8px; font-weight:600;">Original vector —
+                        spiky, uneven</div>
                     <div style="display:flex; align-items:flex-end; gap:4px; height:70px;">
                         <div style="width:18px; background:#4299e1; height:12px; border-radius:2px 2px 0 0;"></div>
                         <div style="width:18px; background:#4299e1; height:60px; border-radius:2px 2px 0 0;"></div>
@@ -198,11 +202,13 @@
                         <div style="width:18px; background:#4299e1; height:10px; border-radius:2px 2px 0 0;"></div>
                         <div style="width:18px; background:#4299e1; height:30px; border-radius:2px 2px 0 0;"></div>
                     </div>
-                    <div style="font-size:11px; color:#e53e3e; margin-top:8px;">⚠ Uniform buckets waste bits on the tiny values, clip the tall ones</div>
+                    <div style="font-size:11px; color:#e53e3e; margin-top:8px;">⚠ Uniform buckets waste bits on the tiny
+                        values, clip the tall ones</div>
                 </div>
                 <div style="font-size:24px; color:#a0aec0; align-self:center;">→</div>
                 <div style="flex:1; min-width:200px;">
-                    <div style="font-size:12px; color:#4a5568; margin-bottom:8px; font-weight:600;">After rotation — smooth, predictable</div>
+                    <div style="font-size:12px; color:#4a5568; margin-bottom:8px; font-weight:600;">After rotation —
+                        smooth, predictable</div>
                     <div style="display:flex; align-items:flex-end; gap:4px; height:70px;">
                         <div style="width:18px; background:#68d391; height:30px; border-radius:2px 2px 0 0;"></div>
                         <div style="width:18px; background:#68d391; height:38px; border-radius:2px 2px 0 0;"></div>
@@ -213,7 +219,8 @@
                         <div style="width:18px; background:#68d391; height:29px; border-radius:2px 2px 0 0;"></div>
                         <div style="width:18px; background:#68d391; height:20px; border-radius:2px 2px 0 0;"></div>
                     </div>
-                    <div style="font-size:11px; color:#38a169; margin-top:8px;">✓ Now every coordinate looks similar — one set of buckets fits all</div>
+                    <div style="font-size:11px; color:#38a169; margin-top:8px;">✓ Now every coordinate looks similar —
+                        one set of buckets fits all</div>
                 </div>
             </div>
         </div>
@@ -252,11 +259,15 @@
         </p>
 
         <!-- Visual: two-stage pipeline -->
-        <div style="background:#f7fafc; border:1px solid #e2e8f0; border-radius:10px; padding:20px 24px; margin:24px 0;">
-            <div style="font-size:12px; font-weight:700; color:#718096; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:16px;">TurboQuant's two-stage pipeline</div>
+        <div
+            style="background:#f7fafc; border:1px solid #e2e8f0; border-radius:10px; padding:20px 24px; margin:24px 0;">
+            <div
+                style="font-size:12px; font-weight:700; color:#718096; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:16px;">
+                TurboQuant's two-stage pipeline</div>
             <div style="display:flex; align-items:center; gap:0; flex-wrap:wrap;">
 
-                <div style="text-align:center; padding:12px 16px; background:#ebf8ff; border:1.5px solid #90cdf4; border-radius:8px; min-width:120px; flex:1;">
+                <div
+                    style="text-align:center; padding:12px 16px; background:#ebf8ff; border:1.5px solid #90cdf4; border-radius:8px; min-width:120px; flex:1;">
                     <div style="font-size:22px; margin-bottom:4px;">📦</div>
                     <div style="font-size:12px; font-weight:700; color:#2b6cb0;">Input KV vector</div>
                     <div style="font-size:11px; color:#4a5568; margin-top:4px;">16-bit float<br>e.g. 4096 dims</div>
@@ -264,15 +275,18 @@
 
                 <div style="padding:0 6px; color:#a0aec0; font-size:18px;">→</div>
 
-                <div style="text-align:center; padding:12px 16px; background:#f0fff4; border:1.5px solid #9ae6b4; border-radius:8px; min-width:120px; flex:1;">
+                <div
+                    style="text-align:center; padding:12px 16px; background:#f0fff4; border:1.5px solid #9ae6b4; border-radius:8px; min-width:120px; flex:1;">
                     <div style="font-size:22px; margin-bottom:4px;">🔀</div>
                     <div style="font-size:12px; font-weight:700; color:#276749;">Random Rotation</div>
-                    <div style="font-size:11px; color:#4a5568; margin-top:4px;">Scrambles coordinates<br>→ uniform shape</div>
+                    <div style="font-size:11px; color:#4a5568; margin-top:4px;">Scrambles coordinates<br>→ uniform shape
+                    </div>
                 </div>
 
                 <div style="padding:0 6px; color:#a0aec0; font-size:18px;">→</div>
 
-                <div style="text-align:center; padding:12px 16px; background:#fffaf0; border:1.5px solid #fbd38d; border-radius:8px; min-width:120px; flex:1;">
+                <div
+                    style="text-align:center; padding:12px 16px; background:#fffaf0; border:1.5px solid #fbd38d; border-radius:8px; min-width:120px; flex:1;">
                     <div style="font-size:22px; margin-bottom:4px;">🗜️</div>
                     <div style="font-size:12px; font-weight:700; color:#7b341e;">Lloyd-Max Quant.</div>
                     <div style="font-size:11px; color:#4a5568; margin-top:4px;">Optimal buckets<br>(b−1 bits)</div>
@@ -280,15 +294,18 @@
 
                 <div style="padding:0 6px; color:#a0aec0; font-size:18px;">→</div>
 
-                <div style="text-align:center; padding:12px 16px; background:#faf5ff; border:1.5px solid #d6bcfa; border-radius:8px; min-width:120px; flex:1;">
+                <div
+                    style="text-align:center; padding:12px 16px; background:#faf5ff; border:1.5px solid #d6bcfa; border-radius:8px; min-width:120px; flex:1;">
                     <div style="font-size:22px; margin-bottom:4px;">🩹</div>
                     <div style="font-size:12px; font-weight:700; color:#553c9a;">1-bit QJL Fix</div>
-                    <div style="font-size:11px; color:#4a5568; margin-top:4px;">Captures residual<br>→ unbiased dot products</div>
+                    <div style="font-size:11px; color:#4a5568; margin-top:4px;">Captures residual<br>→ unbiased dot
+                        products</div>
                 </div>
 
                 <div style="padding:0 6px; color:#a0aec0; font-size:18px;">→</div>
 
-                <div style="text-align:center; padding:12px 16px; background:#fff5f5; border:1.5px solid #fc8181; border-radius:8px; min-width:120px; flex:1;">
+                <div
+                    style="text-align:center; padding:12px 16px; background:#fff5f5; border:1.5px solid #fc8181; border-radius:8px; min-width:120px; flex:1;">
                     <div style="font-size:22px; margin-bottom:4px;">💾</div>
                     <div style="font-size:12px; font-weight:700; color:#9b2c2c;">Compressed KV</div>
                     <div style="font-size:11px; color:#4a5568; margin-top:4px;">~3.5–4 bits total<br>6× smaller</div>
@@ -306,69 +323,6 @@
             corrects the bias perfectly. This is the <strong>Quantized Johnson-Lindenstrauss (QJL)</strong> trick.
         </p>
 
-        <h3>How Close to Perfect Is It?</h3>
-
-        <p>
-            This is the part I found most interesting. Most compression papers just benchmark against other
-            methods — "we beat KIVI by 12%." TurboQuant does something rarer: it benchmarks against
-            <em>the universe</em>.
-        </p>
-
-        <p>
-            Information theory sets a hard floor on compression. For any \(b\)-bit scheme, there is a
-            mathematical limit — derived from Shannon's theory — on how small the reconstruction error can
-            possibly be. It doesn't matter how clever your algorithm is, or how much compute you throw at it.
-            Below that floor, you simply cannot go. It's like asking how efficient a heat engine can be:
-            thermodynamics gives you a ceiling (Carnot efficiency), and no engineering trick can beat it.
-        </p>
-
-        <p>
-            The catch is that this theoretical limit assumes your algorithm can <em>see the data distribution
-            first</em> — it can study your vectors, learn their shape, and tune the compressor specifically
-            for them. TurboQuant is <strong>data-oblivious</strong>: it never looks at the data. It gets one
-            fixed rotation matrix and one fixed quantizer, and it must work for any input it encounters at
-            runtime.
-        </p>
-
-        <div class="highlight-box">
-            Despite being blind to the data, TurboQuant's error is within <strong>2.7× of what even an
-            all-knowing, data-aware compressor could achieve</strong>. The paper proves this with a formal
-            bound — not just a benchmark.
-        </div>
-
-        <p>
-            That 2.7× gap is not a bug. It's the fundamental cost of being online and data-oblivious, and
-            the paper proves it can't be closed without peeking at the distribution first. What makes this
-            remarkable is that TurboQuant can <em>prove</em> it's close to the ceiling — not just claim it.
-            Most compression methods never even attempt that comparison.
-        </p>
-
-        <div style="background:#f7fafc; border:1px solid #e2e8f0; border-radius:10px; padding:18px 24px; margin:24px 0;">
-            <div style="font-size:12px; font-weight:700; color:#718096; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:14px;">How TurboQuant compares</div>
-            <div style="display:flex; flex-direction:column; gap:10px;">
-                <div>
-                    <div style="display:flex; justify-content:space-between; font-size:12px; color:#4a5568; margin-bottom:3px;">
-                        <span>Theoretical limit (Shannon lower bound)</span><span style="font-weight:700; color:#38a169;">1.0×</span>
-                    </div>
-                    <div style="height:10px; background:#c6f6d5; border-radius:4px; width:37%;"></div>
-                </div>
-                <div>
-                    <div style="display:flex; justify-content:space-between; font-size:12px; color:#4a5568; margin-bottom:3px;">
-                        <span><strong>TurboQuant</strong></span><span style="font-weight:700; color:#4299e1;">2.7× (proven near-optimal)</span>
-                    </div>
-                    <div style="height:10px; background:#bee3f8; border-radius:4px; width:100%;"></div>
-                </div>
-                <div>
-                    <div style="display:flex; justify-content:space-between; font-size:12px; color:#4a5568; margin-bottom:3px;">
-                        <span>Prior methods (KIVI, KVQuant, etc.)</span><span style="font-weight:700; color:#a0aec0;">no formal guarantee</span>
-                    </div>
-                    <div style="height:10px; background:#e2e8f0; border-radius:4px; width:100%; position:relative;">
-                        <div style="position:absolute; right:0; top:0; height:100%; background:repeating-linear-gradient(45deg, #cbd5e0, #cbd5e0 3px, #e2e8f0 3px, #e2e8f0 6px); border-radius:4px; width:100%;"></div>
-                    </div>
-                </div>
-            </div>
-            <div style="font-size:11px; color:#718096; margin-top:10px;">Bar length represents compression quality — shorter is better (closer to theoretical limit)</div>
-        </div>
 
         <h2>Does It Actually Help on Real Hardware?</h2>
 
@@ -415,7 +369,8 @@
         <ul>
             <li><strong>Hardware approach:</strong> raise the bandwidth ceiling so the ridge point shifts
                 <em>left</em>. A chip with 47.5 TB/s on-chip bandwidth has its ridge point far enough left
-                that an attention workload which was memory-bound on an H100 might become compute-limited.</li>
+                that an attention workload which was memory-bound on an H100 might become compute-limited.
+            </li>
             <li><strong>Algorithmic approach:</strong> increase arithmetic intensity by reducing data volume.
                 4-bit quantization doesn't speed up any computation — it just reduces bytes transferred by 4×,
                 moving the workload <em>right</em> on the chart toward compute-bound territory.</li>
