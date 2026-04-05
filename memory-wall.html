@@ -22,24 +22,24 @@
         </div>
 
         <p class="intro">
-            Modern AI accelerators are extraordinarily capable computers that spend most of their time waiting.
-            Not waiting for a calculation to finish — waiting for data to arrive. The bottleneck in
-            almost every LLM inference workload isn't the hardware's theoretical peak performance; it's the bandwidth
-            of the wire between the processor and its memory. Two fundamentally different engineering philosophies are
-            fighting back against this: one rewires the hardware, the other rewrites the algorithm. Both are working.
+            Something that genuinely surprised me when I started looking into LLM inference is that the bottleneck
+            almost never sits where you'd expect. You'd think with chips pushing nearly 2,000 TFLOP/s, the problem
+            would be raw compute. It isn't. The GPU is mostly just waiting for data to arrive from memory.
+            There are two ways people are attacking this — one involves rethinking the hardware entirely, the other
+            involves some surprisingly elegant maths. I want to walk through both.
         </p>
 
-        <h2>The Roofline Model: A Framework for Thinking About Performance</h2>
+        <h2>The Roofline Model: What's Actually Limiting Your Hardware</h2>
 
         <p>
-            To understand why memory matters so much, start with the <strong>Roofline Model</strong> — a simple
-            analytical framework developed at Berkeley in 2009 that remains the best mental model for reasoning
-            about hardware performance. It asks a single question: for a given computation, how many floating-point
-            operations do you perform per byte of data you transfer from memory?
+            There's a simple framework called the <strong>Roofline Model</strong> (Williams et al., Berkeley 2009)
+            that I wish someone had shown me earlier — it makes a lot of hardware behaviour click into place.
+            The core idea: for any computation, ask how many floating-point operations you do per byte you read
+            from memory. This ratio is called <strong>arithmetic intensity</strong>.
         </p>
 
         <p>
-            This ratio is called <strong>arithmetic intensity</strong>. And it governs everything.
+            That single number tells you which of two limits you'll hit first.
         </p>
 
         <div class="animation-container">
@@ -56,38 +56,38 @@
         </div>
 
         <p>
-            Every accelerator has two hard ceilings: its peak compute throughput (FLOP/s) and its peak memory
-            bandwidth (bytes/s). The ratio of those two ceilings defines the <em>ridge point</em> — the minimum
-            arithmetic intensity at which a workload can fully utilise the chip's compute.
+            Every chip has two hard limits: peak compute (FLOP/s) and peak memory bandwidth (bytes/s). Their
+            ratio gives you the <em>ridge point</em> — the minimum arithmetic intensity at which the chip is
+            actually compute-limited rather than waiting on memory. Below the ridge, you're memory-bound;
+            your compute units are mostly idle.
         </p>
 
         <p>
-            For an NVIDIA H100 SXM: peak compute is ~1,979 TFLOP/s (BF16 with sparsity), peak HBM bandwidth is
-            ~3.35 TB/s. The ridge point sits at roughly <strong>590 FLOPs/byte</strong>. Any workload with lower
-            arithmetic intensity than that is <em>memory-bound</em> — the compute units sit idle, waiting for the
-            memory system to deliver the next tile of data.
+            For an H100 SXM: ~1,979 TFLOP/s BF16 compute, ~3.35 TB/s HBM bandwidth.
+            Ridge point: roughly <strong>590 FLOPs/byte</strong>. That's a high bar to clear.
         </p>
 
         <div class="highlight-box">
-            <strong>Where does LLM inference sit?</strong> Attention during autoregressive decoding has an arithmetic
-            intensity of roughly <strong>1–10 FLOPs/byte</strong> — deep in the memory-bound regime, 50–500× below the
-            H100's ridge point. Every generated token requires loading the entire KV-cache from HBM. The GPU is
-            operating at 0.2–2% of its theoretical peak FLOP/s during this operation.
+            <strong>Where does LLM inference sit?</strong> Attention during token generation has an arithmetic
+            intensity of roughly <strong>1–10 FLOPs/byte</strong> — that's 50–500× below the H100's ridge point.
+            Every new token forces a full read of the entire KV-cache from HBM. In practice the GPU is running
+            at something like 0.2–2% of its theoretical peak FLOP/s for this operation.
         </div>
 
         <p>
-            This is the memory wall. It's not a bug in the hardware — it reflects a fundamental tension in
-            von Neumann architectures: compute scales faster than memory bandwidth. But it does mean that
-            for a large and growing class of AI workloads, the correct question isn't "how fast can we compute?"
-            but "how fast can we move data?"
+            This is the memory wall. It's not really a flaw — it's a structural consequence of von Neumann
+            architectures where compute has historically scaled faster than memory bandwidth. But it means that
+            for a lot of modern AI workloads, the right question isn't "how fast can we compute?" — it's
+            "how fast can we move data?"
         </p>
 
-        <h2>Why the KV-Cache Is the Villain</h2>
+        <h2>Why the KV-Cache Makes This So Bad</h2>
 
         <p>
-            During LLM inference, every transformer layer caches the Key and Value projections for all previous
-            tokens. This avoids recomputing them on each new token — but it creates a memory structure that grows
-            linearly with context length and must be fully read every single decoding step.
+            To see why this is such a problem in practice, it helps to think about what the KV-cache actually is.
+            During LLM inference, every transformer layer stores the Key and Value projections for all previous
+            tokens so they don't need to be recomputed. Reasonable idea — but it creates a memory structure
+            that grows linearly with context length and has to be fully read on every single generated token.
         </p>
 
         <div class="math-block">
@@ -98,88 +98,92 @@
         </div>
 
         <p>
-            Every generated token triggers a full read of this structure. At 3.35 TB/s of HBM bandwidth, reading
-            320 GB takes about 95 milliseconds — just for the attention memory access, before any computation.
-            Decoding at that context length bottoms out at roughly 10 tokens per second per chip regardless of
-            how many FLOP/s the chip can theoretically deliver.
+            At 3.35 TB/s of HBM bandwidth, reading 320 GB takes around 95 ms — and that's just the memory
+            access, before any computation. You bottom out at roughly 10 tokens per second per chip for that
+            context length, regardless of how beefy the ALUs are. The compute is irrelevant; you're just waiting
+            for data.
         </p>
 
-        <h2>Philosophy 1: Change the Hardware</h2>
+        <h2>Approach 1: Fix the Hardware</h2>
 
         <p>
-            The hardware-first response to the memory wall asks: what if the memory system itself were redesigned?
-            The bottleneck is the physical distance between the processor and its DRAM — data crosses a PCB, goes
-            through a memory controller, and arrives many clock cycles after it was requested. What if you eliminated
-            that distance?
+            One response is to ask whether the memory system itself is designed wrong, or at least not designed
+            for this use case. The bottleneck comes from the physical gap between the processor and its DRAM —
+            data has to cross a PCB, go through a memory controller, and eventually arrive many clock cycles later.
+            What if you closed that gap?
         </p>
 
         <p>
-            Several architectural approaches pursue this:
+            A few approaches people are actually building:
         </p>
 
         <ul>
-            <li><strong>On-chip SRAM at scale.</strong> Moving computation closer to SRAM — or putting more SRAM on
-                the die — eliminates off-chip accesses. Graphcore's IPU, for instance, places 900 MB of SRAM directly
-                on the compute die, distributed across 1,472 independent processors, delivering 47.5 TB/s of on-chip
-                bandwidth — roughly 14× the H100's HBM bandwidth. The tradeoff is capacity: 900 MB versus 80 GB.
-                But for workloads that fit, or that can be partitioned to fit, the bandwidth advantage is enormous.</li>
-            <li><strong>3D stacking.</strong> High-bandwidth memory (HBM) itself was the first generation of this —
-                stacking DRAM dies vertically on the same package as the compute die, using through-silicon vias (TSVs)
-                to dramatically shorten the memory path. The next step is bonding memory directly onto the compute die
-                wafer. Wafer-on-wafer (WoW) stacking, used in Graphcore's Bow IPU, goes further by bonding an entire
-                power-delivery wafer to the compute wafer, allowing higher clock speeds at lower voltage.</li>
-            <li><strong>Near-memory computing.</strong> Process-in-Memory (PIM) and Processing-Near-Memory (PNM)
-                architectures place compute logic inside or beside the memory dies themselves — Samsung's HBM-PIM and
-                SK Hynix's AiMX are commercial examples. The idea is to perform simple operations (add, multiply, ReLU)
-                where the data already lives, before it crosses the bus.</li>
-            <li><strong>Optical interconnects.</strong> Google's TPU v4 uses optical circuit switching to reconfigure
-                inter-chip network topology in milliseconds and to eliminate the energy cost of electrical signal
-                conversion at each hop. This doesn't increase per-chip bandwidth but dramatically improves the
-                aggregate bandwidth of large, multi-chip systems.</li>
+            <li><strong>More on-chip SRAM.</strong> If your memory lives right next to your compute units on the
+                same die, access latency drops to near-zero and bandwidth shoots up. Graphcore's IPU takes this
+                pretty far — 900 MB of SRAM distributed across 1,472 tiles on one chip, giving 47.5 TB/s of
+                on-chip bandwidth (roughly 14× what the H100 gets from HBM). The catch is capacity: 900 MB versus
+                80 GB. But for workloads that fit, the bandwidth advantage is real.</li>
+            <li><strong>3D stacking.</strong> HBM itself was a step in this direction — DRAM dies stacked vertically
+                on the same package as the compute die, connected via through-silicon vias. It shortens the memory
+                path without giving up capacity. Wafer-on-wafer (WoW) stacking goes further still, bonding
+                wafers face-to-face, which is how Graphcore's Bow IPU gets a 40% clock speed boost over its
+                predecessor.</li>
+            <li><strong>Processing-in-Memory (PIM).</strong> Rather than moving data to compute, put some compute
+                next to the data. Samsung's HBM-PIM and SK Hynix's AiMX do this — you can run simple operations
+                like adds or ReLUs inside the memory die before anything crosses the bus. Doesn't solve everything,
+                but reduces how much traffic actually needs to move.</li>
+            <li><strong>Optical interconnects.</strong> This is more about multi-chip bandwidth than single-chip
+                memory, but Google's TPU v4 uses optical circuit switching between chips — physically tilting
+                mirrors to redirect light rather than converting optical signals to electrical ones at every hop.
+                It cuts interconnect power and lets you dynamically reconfigure network topology in milliseconds.</li>
         </ul>
 
         <p>
-            The hardware philosophy essentially tries to <strong>raise the roof</strong> — increase the bandwidth
-            ceiling so that the ridge point shifts left, and more workloads fall into the compute-bound region.
+            The common thread: <strong>raise the bandwidth ceiling</strong> so the ridge point shifts left and
+            attention lands closer to the compute-bound region.
         </p>
 
-        <h2>Philosophy 2: Change the Algorithm</h2>
+        <h2>Approach 2: Fix the Algorithm</h2>
 
         <p>
-            The algorithmic response to the memory wall is different. Rather than building a faster pipe, it
-            asks: can we reduce the amount of data that needs to flow through the pipe at all?
-        </p>
-
-        <p>
-            Quantization is the most mature answer. If each KV-cache element occupies 16 bits, and you can represent
-            it in 4 bits with acceptable fidelity, the bandwidth demand drops by 4×. The arithmetic intensity
-            quadruples. The workload moves right on the roofline.
+            The other direction is to just reduce how much data needs to move in the first place. If the pipe
+            is the bottleneck, send less through it.
         </p>
 
         <p>
-            But KV-cache quantization is harder than weight quantization. Model weights are static and can be
-            calibrated offline; KV-cache entries are created at runtime, are unique to each request, and depend
-            on inputs the system has never seen. The algorithm must be <em>data-oblivious</em> — it cannot
-            look at the distribution of keys and values for a given prompt before deciding how to quantize them.
-        </p>
-
-        <h2>Google's TurboQuant: Near-Optimal Online Compression</h2>
-
-        <p>
-            This is exactly the problem that <strong>TurboQuant</strong> (Zandieh et al., Google Research, ICLR 2026)
-            solves — and it solves it with a formal proof that the solution is close to the best theoretically
-            possible.
+            Quantization is the obvious lever. If each KV-cache element is 16 bits and you can represent it
+            in 4 bits without wrecking accuracy, bandwidth demand drops 4× and your arithmetic intensity
+            quadruples — the workload shifts right on the roofline chart toward compute territory.
         </p>
 
         <p>
-            The paper's central insight is elegant. For a \(d\)-dimensional vector \( x \), the challenge of
-            data-oblivious quantization is that you don't know ahead of time how the magnitudes are distributed
-            across coordinates. Some coordinates might be very large, others near zero — a scalar quantizer that
-            treats all coordinates identically will waste bits on the small ones and overflow on the large ones.
+            The tricky part is that KV-cache quantization is harder than quantizing model weights. Weights are
+            fixed — you can calibrate a quantizer offline with a representative dataset, spend hours optimising
+            it, and then deploy. KV-cache entries are created at runtime, are unique to each user request, and
+            depend on inputs you've never seen before. The algorithm has to work <em>data-obliviously</em> —
+            it can't peek at the distribution of this particular prompt's keys and values before deciding how
+            to compress them.
+        </p>
+
+        <h2>Google's TurboQuant: A Clever Algorithmic Solution</h2>
+
+        <p>
+            I came across <strong>TurboQuant</strong> (Zandieh et al., Google Research, ICLR 2026) recently and
+            it's a good example of a paper where the core idea is simple enough to explain in a few sentences,
+            but the proof that it actually works is non-trivial. It tackles data-oblivious KV-cache compression
+            and comes with a formal guarantee that it's close to the theoretically best possible.
         </p>
 
         <p>
-            TurboQuant's solution: apply a <strong>random orthogonal rotation</strong> to the vector first.
+            The core difficulty with data-oblivious quantization is this: for a \(d\)-dimensional vector \(x\),
+            you don't know ahead of time how the magnitudes are spread across coordinates. Some might be large,
+            some near zero — if you apply a simple uniform scalar quantizer to all coordinates identically,
+            you waste bits on the small ones and saturate on the large ones.
+        </p>
+
+        <p>
+            TurboQuant's fix: apply a <strong>random orthogonal rotation</strong> to the vector before
+            quantizing.
         </p>
 
         <div class="math-block">
@@ -192,22 +196,26 @@
         </div>
 
         <p>
-            Because the post-rotation coordinates have a known, fixed distribution — regardless of what the original
-            \( x \) was — an <strong>optimal Lloyd-Max scalar quantizer</strong> can be designed once, offline, for
-            that distribution. The same quantizer works for every input, with no per-vector calibration needed.
+            After rotation, the coordinates of \(\tilde{x} = Rx\) are nearly independent and identically
+            distributed in high dimensions — following a Beta\((1/2, (d{-}1)/2)\) distribution regardless of
+            what \(x\) originally was. That's the key: you now have a fixed, known distribution to design your
+            quantizer for. An <strong>optimal Lloyd-Max scalar quantizer</strong> can be computed once offline
+            for that distribution and reused for every single input vector. No per-vector calibration needed.
         </p>
 
         <p>
-            That handles MSE-optimal compression. But attention doesn't minimise MSE — it computes
-            <strong>inner products</strong> between queries and keys. A quantizer that minimises reconstruction
-            error can still introduce systematic bias in dot products.
+            That gets you MSE-optimal compression. But attention doesn't care about MSE — it computes
+            <strong>inner products</strong> between queries and keys. Minimising reconstruction error and
+            minimising inner-product error aren't the same thing, and a naive quantizer introduces a
+            systematic bias into the dot products.
         </p>
 
         <p>
-            TurboQuant fixes this with a second stage: after the \((b{-}1)\)-bit MSE quantizer, it computes the
-            residual error and applies a <strong>1-bit Quantized Johnson-Lindenstrauss (QJL) transform</strong> on
-            that residual. The QJL stage projects the residual onto a random sign vector — storing only a single bit
-            — and its expectation is an unbiased estimator of the inner product of the residual.
+            TurboQuant handles this with a second stage. After the \((b{-}1)\)-bit MSE step, it takes the
+            residual error and applies a <strong>1-bit Quantized Johnson-Lindenstrauss (QJL) transform</strong>
+            — essentially projecting the residual onto a random sign vector and storing just the sign.
+            It sounds crude but the expectation of that product turns out to be an unbiased estimator of the
+            inner product of the residual.
         </p>
 
         <div class="math-block">
@@ -219,39 +227,36 @@
         </div>
 
         <p>
-            The paper proves that this scheme achieves:
+            The paper proves that the combined scheme achieves:
         </p>
 
         <ul>
-            <li><strong>MSE distortion</strong> \( \leq \frac{\sqrt{3}\pi}{2} \cdot \frac{1}{4^b} \), which is
+            <li><strong>MSE distortion</strong> \( \leq \frac{\sqrt{3}\pi}{2} \cdot \frac{1}{4^b} \), which sits
                 within a factor of \( \frac{3\pi}{2} \approx 2.7 \) of the information-theoretic lower bound
-                \( \frac{1}{4^b} \). No prior method came with such a guarantee.</li>
+                \( \frac{1}{4^b} \). No previous KV-cache method had any formal guarantee like this.</li>
             <li><strong>Inner-product distortion</strong> \( \leq \frac{\sqrt{3}\pi^2 \|y\|_2^2}{d} \cdot \frac{1}{4^b}
-                \), also within a constant of optimal.</li>
+                \), also provably within a constant factor of optimal.</li>
         </ul>
 
         <p>
-            Near-optimal means: you cannot do significantly better than this with any data-oblivious online scheme,
-            regardless of how clever the algorithm. TurboQuant is essentially extracting everything the information
-            theory says is extractable, in a format that runs in real-time on production hardware.
+            "Near-optimal" here means: no data-oblivious online algorithm can do significantly better, regardless
+            of how clever you get. That last factor of 2.7× is basically unavoidable without seeing the
+            input distribution first. It's a nice example of an engineering result hitting a theoretical ceiling
+            and being able to prove it.
         </p>
 
-        <h2>The Hardware Impact: What Happens on an Actual GPU</h2>
+        <h2>Does It Actually Help on Real Hardware?</h2>
 
         <p>
-            Algorithmic elegance is only half the story. The other half is whether the algorithm maps well onto
-            the hardware it runs on.
-        </p>
-
-        <p>
-            TurboQuant's structure — random rotation (a matrix multiply) followed by coordinate-wise scalar
-            quantization — is <strong>fully vectorisable</strong>. There are no data-dependent branches, no codebook
-            lookups, no scatter-gather memory patterns. It maps directly to tensor core operations and SIMD
-            instructions. A Triton kernel implementation already exists.
+            The theory is satisfying, but I was more curious about whether the algorithm structure maps well onto
+            an actual GPU. The operations involved — a random rotation (matrix multiply) plus coordinate-wise
+            scalar quantization — are <strong>fully vectorisable</strong> with no data-dependent branches and no
+            codebook lookups. It fits naturally onto tensor cores. There's already a Triton kernel implementation
+            for it.
         </p>
 
         <p>
-            The results on an NVIDIA H100:
+            The benchmark numbers on an H100 are pretty striking:
         </p>
 
         <div class="animation-container">
@@ -262,24 +267,24 @@
         </div>
 
         <ul>
-            <li><strong>Up to 8× speedup</strong> in attention logit computation at 4-bit compression over FP32
-                baseline — not because the arithmetic is faster, but because 4× fewer bytes cross the HBM bus.</li>
+            <li><strong>Up to 8× speedup</strong> in attention logit computation at 4-bit — not because the maths
+                got faster, but because 4× fewer bytes are crossing the HBM bus per token.</li>
             <li><strong>6× reduction in KV-cache memory</strong> across LongBench workloads (Llama-3.1-8B,
                 Ministral-7B).</li>
-            <li><strong>Zero measurable accuracy loss</strong> at 3.5-bit compression across all LongBench tasks.
-                At 2.5-bit, average score drops by 0.62 points out of 50.</li>
+            <li><strong>No measurable accuracy loss at 3.5-bit</strong> across all LongBench tasks. At 2.5-bit,
+                the average score drops 0.62 points out of 50 — pretty marginal.</li>
         </ul>
 
         <p>
-            On the needle-in-a-haystack retrieval benchmark at 104K context length, TurboQuant scores 0.997
-            versus full precision's 1.0. KIVI, the previous best, scores 0.981 at the same compression ratio.
+            On needle-in-a-haystack retrieval at 104K context length it scores 0.997 versus full precision's 1.0.
+            KIVI — probably the closest prior method — scores 0.981 at the same compression ratio.
         </p>
 
-        <h2>Two Philosophies, One Problem</h2>
+        <h2>Two Approaches, Same Problem</h2>
 
         <p>
-            It's worth pausing to notice that the hardware approach and the algorithmic approach are solving the
-            same underlying problem through opposite levers. The roofline model makes the relationship precise.
+            What I find interesting is that the hardware approach and the algorithmic approach are actually attacking
+            the same constraint from opposite ends, and the roofline model makes that relationship precise.
         </p>
 
         <div class="animation-container">
@@ -290,69 +295,58 @@
         </div>
 
         <ul>
-            <li><strong>Hardware approach:</strong> increase the memory bandwidth ceiling. The ridge point moves
-                <em>left</em> — more workloads fall into the compute-bound region without changing the algorithm.
-                A chip with 47.5 TB/s on-chip bandwidth places the ridge point much further left than one with
-                3.35 TB/s HBM. An attention workload that was memory-bound becomes compute-limited.
-            </li>
-            <li><strong>Algorithmic approach:</strong> increase the arithmetic intensity of the workload. Quantizing
-                from FP16 to 4-bit doesn't change the compute operations; it reduces the bytes transferred by 4×,
-                moving the workload <em>right</em> on the roofline chart — potentially into compute territory.</li>
+            <li><strong>Hardware approach:</strong> raise the bandwidth ceiling so the ridge point shifts
+                <em>left</em>. A chip with 47.5 TB/s on-chip bandwidth has its ridge point far enough left
+                that an attention workload which was memory-bound on an H100 might become compute-limited.</li>
+            <li><strong>Algorithmic approach:</strong> increase arithmetic intensity by reducing data volume.
+                4-bit quantization doesn't speed up any computation — it just reduces bytes transferred by 4×,
+                moving the workload <em>right</em> on the chart toward compute-bound territory.</li>
         </ul>
 
         <p>
-            The strategies are not competing — they're complementary. A system that combines high-bandwidth
-            on-chip memory with aggressive online quantization attacks the memory wall from both sides
-            simultaneously. The hardware makes the pipe wider; the algorithm reduces what flows through it.
+            The two approaches are complementary rather than competing. Wide pipe plus less flowing through it
+            is obviously better than either alone.
         </p>
 
-        <h2>The Remaining Challenges</h2>
+        <h2>Where Each Approach Falls Short</h2>
 
         <p>
-            Neither approach is a complete solution. The hardware approach requires either accepting limited
-            capacity (on-chip SRAM is small) or accepting the cost and latency of complex chip designs. The
-            algorithmic approach requires careful analysis: quantization is lossy, and while TurboQuant's
-            proofs are tight, "near-optimal for the average case" is not the same as "lossless for every
-            possible input." Adversarial queries or unusual attention patterns could sit in the tail of the
-            distribution where the approximation is weakest.
+            Neither is a complete fix. On the hardware side, more on-chip SRAM means less capacity — 900 MB
+            is nowhere near enough to hold a frontier model, so you end up with complex pipeline-parallel
+            setups splitting layers across many chips. SRAM density also grows slowly; model sizes and context
+            lengths are outrunning it.
         </p>
 
         <p>
-            There are also fundamental limits to how far each strategy can push. Shannon's rate-distortion
-            theory says that at \(b\) bits per coordinate, you cannot compress better than \(\frac{1}{4^b}\).
-            TurboQuant is within 2.7× of that. The last factor of 2.7× is provably irreducible for any
-            data-oblivious scheme — you'd need access to the input distribution to do better.
+            On the algorithm side, quantization is lossy by definition. TurboQuant's proofs are tight, but
+            "near-optimal on average" isn't the same as "lossless for every input." Unusual attention patterns
+            or adversarial prompts could land in the tail of the Beta distribution where the quantizer is
+            least accurate. And there's a hard floor: Shannon's rate-distortion theory says at \(b\) bits
+            per coordinate you can't compress better than \(\frac{1}{4^b}\). TurboQuant is within 2.7× of
+            that — the remaining factor is provably unrecoverable without seeing the input distribution first.
+        </p>
+
+        <h2>Why This Is Only Going to Get More Relevant</h2>
+
+        <p>
+            The memory wall has been widening since the 1980s — compute density has historically doubled every
+            2–3 years while memory bandwidth doubles every 4–5. The KV-cache version of this problem is
+            relatively new but the underlying tension isn't.
         </p>
 
         <p>
-            On the hardware side, SRAM density grows slowly. The exponential growth in model sizes and
-            context lengths is outpacing improvements in on-chip memory capacity. Even a chip with 10× today's
-            on-chip SRAM would still require model parallelism across dozens of chips for frontier-scale models.
-        </p>
-
-        <h2>Why This Problem Is Getting Harder, Not Easier</h2>
-
-        <p>
-            The memory wall is a moving target. As context windows expand from 8K to 128K to millions of tokens,
-            KV-cache size grows proportionally while model weights stay fixed. As batch sizes increase for
-            throughput, the total working set expands. As we move toward mixture-of-experts models where different
-            expert weights must be paged in dynamically, the memory access pattern becomes more irregular and
-            harder to prefetch.
+            What makes it particularly pointed now is that context windows keep expanding (8K → 128K → millions
+            of tokens), mixture-of-experts models require paging different expert weights in dynamically, and
+            batch sizes for throughput push the working set larger. Every trend is making the memory pressure
+            worse, not better.
         </p>
 
         <p>
-            The compute density of accelerators has historically doubled every 2–3 years. Memory bandwidth has
-            doubled every 4–5 years. That gap is the memory wall, and it has been widening since the 1980s.
-            The specific form it takes for LLMs — the KV-cache problem — is new, but the structural tension
-            is ancient by computing standards.
-        </p>
-
-        <p>
-            What makes the current moment interesting is that rigorous mathematical tools from information theory
-            and random matrix theory are being brought to bear on what previously felt like an engineering
-            problem. TurboQuant isn't just a new hyperparameter to tune — it comes with a proof that it is
-            near-optimal in a formal sense. When engineering results meet theoretical lower bounds, you know
-            you understand the problem.
+            I think what's genuinely interesting about papers like TurboQuant is that they bring real theoretical
+            machinery — information theory, random matrix theory — to what could easily be treated as a pure
+            engineering problem of tweaking hyperparameters until accuracy holds. When you can prove your
+            compression scheme is within a constant factor of the information-theoretic optimum, you've
+            actually understood the problem rather than just found a workaround for it.
         </p>
 
         <h2>References</h2>
