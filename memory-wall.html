@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Memory Wall: Why AI Is Starved for Bandwidth and How We're Fighting Back</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <a href="index.html" class="back-button">← Back to Blog</a>
+
+        <div class="article-header-row">
+            <div class="article-header-text">
+                <h1>The Memory Wall: Why AI Is Starved for Bandwidth and the Algorithmic Cure</h1>
+                <div class="article-meta">April 2026 • AI Systems</div>
+            </div>
+            <img src="assets/images/memory-wall-banner.svg" alt="Roofline Model" class="article-banner-side">
+        </div>
+
+        <p class="intro">
+            Modern AI accelerators are extraordinarily capable computers that spend most of their time waiting.
+            Not waiting for a calculation to finish — waiting for data to arrive. The bottleneck in
+            almost every LLM inference workload isn't the hardware's theoretical peak performance; it's the bandwidth
+            of the wire between the processor and its memory. Two fundamentally different engineering philosophies are
+            fighting back against this: one rewires the hardware, the other rewrites the algorithm. Both are working.
+        </p>
+
+        <h2>The Roofline Model: A Framework for Thinking About Performance</h2>
+
+        <p>
+            To understand why memory matters so much, start with the <strong>Roofline Model</strong> — a simple
+            analytical framework developed at Berkeley in 2009 that remains the best mental model for reasoning
+            about hardware performance. It asks a single question: for a given computation, how many floating-point
+            operations do you perform per byte of data you transfer from memory?
+        </p>
+
+        <p>
+            This ratio is called <strong>arithmetic intensity</strong>. And it governs everything.
+        </p>
+
+        <div class="animation-container">
+            <canvas id="rooflineCanvas" width="580" height="320"
+                style="border: 1px solid #e2e8f0; border-radius: 8px; display: block; margin: 0 auto; background: #f7fafc;"></canvas>
+            <p class="caption">The Roofline Model. Drag the slider to see where different AI operations sit — and why
+                attention is almost always memory-bound.</p>
+            <div style="text-align: center; margin-top: 10px;">
+                <input type="range" id="intensitySlider" min="0" max="100" value="20"
+                    style="width: 60%; accent-color: #4299e1;">
+                <div id="intensityLabel"
+                    style="font-family: monospace; font-size: 13px; color: #4a5568; margin-top: 4px;"></div>
+            </div>
+        </div>
+
+        <p>
+            Every accelerator has two hard ceilings: its peak compute throughput (FLOP/s) and its peak memory
+            bandwidth (bytes/s). The ratio of those two ceilings defines the <em>ridge point</em> — the minimum
+            arithmetic intensity at which a workload can fully utilise the chip's compute.
+        </p>
+
+        <p>
+            For an NVIDIA H100 SXM: peak compute is ~1,979 TFLOP/s (BF16 with sparsity), peak HBM bandwidth is
+            ~3.35 TB/s. The ridge point sits at roughly <strong>590 FLOPs/byte</strong>. Any workload with lower
+            arithmetic intensity than that is <em>memory-bound</em> — the compute units sit idle, waiting for the
+            memory system to deliver the next tile of data.
+        </p>
+
+        <div class="highlight-box">
+            <strong>Where does LLM inference sit?</strong> Attention during autoregressive decoding has an arithmetic
+            intensity of roughly <strong>1–10 FLOPs/byte</strong> — deep in the memory-bound regime, 50–500× below the
+            H100's ridge point. Every generated token requires loading the entire KV-cache from HBM. The GPU is
+            operating at 0.2–2% of its theoretical peak FLOP/s during this operation.
+        </div>
+
+        <p>
+            This is the memory wall. It's not a bug in the hardware — it reflects a fundamental tension in
+            von Neumann architectures: compute scales faster than memory bandwidth. But it does mean that
+            for a large and growing class of AI workloads, the correct question isn't "how fast can we compute?"
+            but "how fast can we move data?"
+        </p>
+
+        <h2>Why the KV-Cache Is the Villain</h2>
+
+        <p>
+            During LLM inference, every transformer layer caches the Key and Value projections for all previous
+            tokens. This avoids recomputing them on each new token — but it creates a memory structure that grows
+            linearly with context length and must be fully read every single decoding step.
+        </p>
+
+        <div class="math-block">
+            <p>For a model with \( L \) layers, hidden dimension \( d \), and \( T \) context tokens:</p>
+            <p>\[ \text{KV-cache size} = 2 \times L \times T \times d \times \text{bytes\_per\_element} \]</p>
+            <p>Llama-3.1-70B at 128K tokens in FP16: \(\approx\) <strong>320 GB</strong> — four times the model weights.
+            </p>
+        </div>
+
+        <p>
+            Every generated token triggers a full read of this structure. At 3.35 TB/s of HBM bandwidth, reading
+            320 GB takes about 95 milliseconds — just for the attention memory access, before any computation.
+            Decoding at that context length bottoms out at roughly 10 tokens per second per chip regardless of
+            how many FLOP/s the chip can theoretically deliver.
+        </p>
+
+        <h2>Philosophy 1: Change the Hardware</h2>
+
+        <p>
+            The hardware-first response to the memory wall asks: what if the memory system itself were redesigned?
+            The bottleneck is the physical distance between the processor and its DRAM — data crosses a PCB, goes
+            through a memory controller, and arrives many clock cycles after it was requested. What if you eliminated
+            that distance?
+        </p>
+
+        <p>
+            Several architectural approaches pursue this:
+        </p>
+
+        <ul>
+            <li><strong>On-chip SRAM at scale.</strong> Moving computation closer to SRAM — or putting more SRAM on
+                the die — eliminates off-chip accesses. Graphcore's IPU, for instance, places 900 MB of SRAM directly
+                on the compute die, distributed across 1,472 independent processors, delivering 47.5 TB/s of on-chip
+                bandwidth — roughly 14× the H100's HBM bandwidth. The tradeoff is capacity: 900 MB versus 80 GB.
+                But for workloads that fit, or that can be partitioned to fit, the bandwidth advantage is enormous.</li>
+            <li><strong>3D stacking.</strong> High-bandwidth memory (HBM) itself was the first generation of this —
+                stacking DRAM dies vertically on the same package as the compute die, using through-silicon vias (TSVs)
+                to dramatically shorten the memory path. The next step is bonding memory directly onto the compute die
+                wafer. Wafer-on-wafer (WoW) stacking, used in Graphcore's Bow IPU, goes further by bonding an entire
+                power-delivery wafer to the compute wafer, allowing higher clock speeds at lower voltage.</li>
+            <li><strong>Near-memory computing.</strong> Process-in-Memory (PIM) and Processing-Near-Memory (PNM)
+                architectures place compute logic inside or beside the memory dies themselves — Samsung's HBM-PIM and
+                SK Hynix's AiMX are commercial examples. The idea is to perform simple operations (add, multiply, ReLU)
+                where the data already lives, before it crosses the bus.</li>
+            <li><strong>Optical interconnects.</strong> Google's TPU v4 uses optical circuit switching to reconfigure
+                inter-chip network topology in milliseconds and to eliminate the energy cost of electrical signal
+                conversion at each hop. This doesn't increase per-chip bandwidth but dramatically improves the
+                aggregate bandwidth of large, multi-chip systems.</li>
+        </ul>
+
+        <p>
+            The hardware philosophy essentially tries to <strong>raise the roof</strong> — increase the bandwidth
+            ceiling so that the ridge point shifts left, and more workloads fall into the compute-bound region.
+        </p>
+
+        <h2>Philosophy 2: Change the Algorithm</h2>
+
+        <p>
+            The algorithmic response to the memory wall is different. Rather than building a faster pipe, it
+            asks: can we reduce the amount of data that needs to flow through the pipe at all?
+        </p>
+
+        <p>
+            Quantization is the most mature answer. If each KV-cache element occupies 16 bits, and you can represent
+            it in 4 bits with acceptable fidelity, the bandwidth demand drops by 4×. The arithmetic intensity
+            quadruples. The workload moves right on the roofline.
+        </p>
+
+        <p>
+            But KV-cache quantization is harder than weight quantization. Model weights are static and can be
+            calibrated offline; KV-cache entries are created at runtime, are unique to each request, and depend
+            on inputs the system has never seen. The algorithm must be <em>data-oblivious</em> — it cannot
+            look at the distribution of keys and values for a given prompt before deciding how to quantize them.
+        </p>
+
+        <h2>Google's TurboQuant: Near-Optimal Online Compression</h2>
+
+        <p>
+            This is exactly the problem that <strong>TurboQuant</strong> (Zandieh et al., Google Research, ICLR 2026)
+            solves — and it solves it with a formal proof that the solution is close to the best theoretically
+            possible.
+        </p>
+
+        <p>
+            The paper's central insight is elegant. For a \(d\)-dimensional vector \( x \), the challenge of
+            data-oblivious quantization is that you don't know ahead of time how the magnitudes are distributed
+            across coordinates. Some coordinates might be very large, others near zero — a scalar quantizer that
+            treats all coordinates identically will waste bits on the small ones and overflow on the large ones.
+        </p>
+
+        <p>
+            TurboQuant's solution: apply a <strong>random orthogonal rotation</strong> to the vector first.
+        </p>
+
+        <div class="math-block">
+            <p>Let \( R \in \mathbb{R}^{d \times d} \) be a random orthogonal matrix. Transform: \( \tilde{x} = Rx \).
+            </p>
+            <p>By the rotational symmetry of the Gaussian measure, the coordinates of \( \tilde{x} \) are nearly
+                <strong>independent and identically distributed</strong> in high dimensions — each following a
+                Beta\((1/2, (d-1)/2)\) distribution.
+            </p>
+        </div>
+
+        <p>
+            Because the post-rotation coordinates have a known, fixed distribution — regardless of what the original
+            \( x \) was — an <strong>optimal Lloyd-Max scalar quantizer</strong> can be designed once, offline, for
+            that distribution. The same quantizer works for every input, with no per-vector calibration needed.
+        </p>
+
+        <p>
+            That handles MSE-optimal compression. But attention doesn't minimise MSE — it computes
+            <strong>inner products</strong> between queries and keys. A quantizer that minimises reconstruction
+            error can still introduce systematic bias in dot products.
+        </p>
+
+        <p>
+            TurboQuant fixes this with a second stage: after the \((b{-}1)\)-bit MSE quantizer, it computes the
+            residual error and applies a <strong>1-bit Quantized Johnson-Lindenstrauss (QJL) transform</strong> on
+            that residual. The QJL stage projects the residual onto a random sign vector — storing only a single bit
+            — and its expectation is an unbiased estimator of the inner product of the residual.
+        </p>
+
+        <div class="math-block">
+            <p><strong>Stage 1 (MSE)</strong>: Apply \(b-1\) bits of Lloyd-Max scalar quantization after rotation.</p>
+            <p><strong>Stage 2 (IP bias correction)</strong>: For residual \( r = x - \hat{x} \), compute \( s =
+                \text{sign}(w^\top r) \) for random \( w \sim \{-1,+1\}^d \).</p>
+            <p>Combined estimator: \( \langle y, \hat{x} \rangle + s \cdot \langle y, w \rangle / \sqrt{d} \) is
+                <strong>unbiased</strong> for \( \langle y, x \rangle \).</p>
+        </div>
+
+        <p>
+            The paper proves that this scheme achieves:
+        </p>
+
+        <ul>
+            <li><strong>MSE distortion</strong> \( \leq \frac{\sqrt{3}\pi}{2} \cdot \frac{1}{4^b} \), which is
+                within a factor of \( \frac{3\pi}{2} \approx 2.7 \) of the information-theoretic lower bound
+                \( \frac{1}{4^b} \). No prior method came with such a guarantee.</li>
+            <li><strong>Inner-product distortion</strong> \( \leq \frac{\sqrt{3}\pi^2 \|y\|_2^2}{d} \cdot \frac{1}{4^b}
+                \), also within a constant of optimal.</li>
+        </ul>
+
+        <p>
+            Near-optimal means: you cannot do significantly better than this with any data-oblivious online scheme,
+            regardless of how clever the algorithm. TurboQuant is essentially extracting everything the information
+            theory says is extractable, in a format that runs in real-time on production hardware.
+        </p>
+
+        <h2>The Hardware Impact: What Happens on an Actual GPU</h2>
+
+        <p>
+            Algorithmic elegance is only half the story. The other half is whether the algorithm maps well onto
+            the hardware it runs on.
+        </p>
+
+        <p>
+            TurboQuant's structure — random rotation (a matrix multiply) followed by coordinate-wise scalar
+            quantization — is <strong>fully vectorisable</strong>. There are no data-dependent branches, no codebook
+            lookups, no scatter-gather memory patterns. It maps directly to tensor core operations and SIMD
+            instructions. A Triton kernel implementation already exists.
+        </p>
+
+        <p>
+            The results on an NVIDIA H100:
+        </p>
+
+        <div class="animation-container">
+            <canvas id="barChart" width="560" height="240"
+                style="border: 1px solid #e2e8f0; border-radius: 8px; display: block; margin: 0 auto; background: #f7fafc;"></canvas>
+            <p class="caption">TurboQuant benchmark results. Attention speedup (left) and KV-cache memory reduction
+                (right) on H100, from Zandieh et al. 2026.</p>
+        </div>
+
+        <ul>
+            <li><strong>Up to 8× speedup</strong> in attention logit computation at 4-bit compression over FP32
+                baseline — not because the arithmetic is faster, but because 4× fewer bytes cross the HBM bus.</li>
+            <li><strong>6× reduction in KV-cache memory</strong> across LongBench workloads (Llama-3.1-8B,
+                Ministral-7B).</li>
+            <li><strong>Zero measurable accuracy loss</strong> at 3.5-bit compression across all LongBench tasks.
+                At 2.5-bit, average score drops by 0.62 points out of 50.</li>
+        </ul>
+
+        <p>
+            On the needle-in-a-haystack retrieval benchmark at 104K context length, TurboQuant scores 0.997
+            versus full precision's 1.0. KIVI, the previous best, scores 0.981 at the same compression ratio.
+        </p>
+
+        <h2>Two Philosophies, One Problem</h2>
+
+        <p>
+            It's worth pausing to notice that the hardware approach and the algorithmic approach are solving the
+            same underlying problem through opposite levers. The roofline model makes the relationship precise.
+        </p>
+
+        <div class="animation-container">
+            <canvas id="rooflineCompare" width="560" height="260"
+                style="border: 1px solid #e2e8f0; border-radius: 8px; display: block; margin: 0 auto; background: #f7fafc;"></canvas>
+            <p class="caption">Both strategies move a workload out of the memory-bound region — but by moving different
+                axes.</p>
+        </div>
+
+        <ul>
+            <li><strong>Hardware approach:</strong> increase the memory bandwidth ceiling. The ridge point moves
+                <em>left</em> — more workloads fall into the compute-bound region without changing the algorithm.
+                A chip with 47.5 TB/s on-chip bandwidth places the ridge point much further left than one with
+                3.35 TB/s HBM. An attention workload that was memory-bound becomes compute-limited.
+            </li>
+            <li><strong>Algorithmic approach:</strong> increase the arithmetic intensity of the workload. Quantizing
+                from FP16 to 4-bit doesn't change the compute operations; it reduces the bytes transferred by 4×,
+                moving the workload <em>right</em> on the roofline chart — potentially into compute territory.</li>
+        </ul>
+
+        <p>
+            The strategies are not competing — they're complementary. A system that combines high-bandwidth
+            on-chip memory with aggressive online quantization attacks the memory wall from both sides
+            simultaneously. The hardware makes the pipe wider; the algorithm reduces what flows through it.
+        </p>
+
+        <h2>The Remaining Challenges</h2>
+
+        <p>
+            Neither approach is a complete solution. The hardware approach requires either accepting limited
+            capacity (on-chip SRAM is small) or accepting the cost and latency of complex chip designs. The
+            algorithmic approach requires careful analysis: quantization is lossy, and while TurboQuant's
+            proofs are tight, "near-optimal for the average case" is not the same as "lossless for every
+            possible input." Adversarial queries or unusual attention patterns could sit in the tail of the
+            distribution where the approximation is weakest.
+        </p>
+
+        <p>
+            There are also fundamental limits to how far each strategy can push. Shannon's rate-distortion
+            theory says that at \(b\) bits per coordinate, you cannot compress better than \(\frac{1}{4^b}\).
+            TurboQuant is within 2.7× of that. The last factor of 2.7× is provably irreducible for any
+            data-oblivious scheme — you'd need access to the input distribution to do better.
+        </p>
+
+        <p>
+            On the hardware side, SRAM density grows slowly. The exponential growth in model sizes and
+            context lengths is outpacing improvements in on-chip memory capacity. Even a chip with 10× today's
+            on-chip SRAM would still require model parallelism across dozens of chips for frontier-scale models.
+        </p>
+
+        <h2>Why This Problem Is Getting Harder, Not Easier</h2>
+
+        <p>
+            The memory wall is a moving target. As context windows expand from 8K to 128K to millions of tokens,
+            KV-cache size grows proportionally while model weights stay fixed. As batch sizes increase for
+            throughput, the total working set expands. As we move toward mixture-of-experts models where different
+            expert weights must be paged in dynamically, the memory access pattern becomes more irregular and
+            harder to prefetch.
+        </p>
+
+        <p>
+            The compute density of accelerators has historically doubled every 2–3 years. Memory bandwidth has
+            doubled every 4–5 years. That gap is the memory wall, and it has been widening since the 1980s.
+            The specific form it takes for LLMs — the KV-cache problem — is new, but the structural tension
+            is ancient by computing standards.
+        </p>
+
+        <p>
+            What makes the current moment interesting is that rigorous mathematical tools from information theory
+            and random matrix theory are being brought to bear on what previously felt like an engineering
+            problem. TurboQuant isn't just a new hyperparameter to tune — it comes with a proof that it is
+            near-optimal in a formal sense. When engineering results meet theoretical lower bounds, you know
+            you understand the problem.
+        </p>
+
+        <h2>References</h2>
+        <ul style="font-size: 0.9em; color: #4a5568;">
+            <li>[1] Williams, S., Waterman, A., Patterson, D. (2009). <a
+                    href="https://dl.acm.org/doi/10.1145/1498765.1498785" target="_blank">Roofline: An Insightful Visual
+                    Performance Model for Floating-Point Programs and Multicore Architectures</a>. Communications of the
+                ACM.</li>
+            <li>[2] Zandieh, A., Daliri, M., Hadian, M., Mirrokni, V. (2025). <a href="https://arxiv.org/abs/2504.19874"
+                    target="_blank">TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate</a>.
+                arXiv:2504.19874. ICLR 2026.</li>
+            <li>[3] Google Research Blog. (2026). <a
+                    href="https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/"
+                    target="_blank">TurboQuant: Redefining AI efficiency with extreme compression</a>.</li>
+            <li>[4] Sheng, Y., et al. (2023). <a href="https://arxiv.org/abs/2305.13245" target="_blank">FlexGen:
+                    High-Throughput Generative Inference of Large Language Models with a Single GPU</a>. ICML 2023.</li>
+            <li>[5] Liu, Z., et al. (2024). <a href="https://arxiv.org/abs/2402.02750" target="_blank">KIVI: A
+                    Tuning-Free Asymmetric 2bit Quantization for KV Cache</a>. ICML 2024.</li>
+            <li>[6] Jouppi, N. P., et al. (2023). TPU v4: An Optically Reconfigurable Supercomputer for Machine Learning
+                with Hardware Support for Embeddings. ISCA 2023.</li>
+            <li>[7] Jia, Z., et al. (2019). <a href="https://arxiv.org/abs/1912.12491" target="_blank">Dissecting the
+                    Graphcore IPU Architecture via Microbenchmarking</a>. arXiv:1912.12491.</li>
+        </ul>
+
+        <div class="footer">
+            <p>Published on April 5, 2026</p>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================================
+        // 1. Interactive Roofline chart
+        // =====================================================================
+        (function () {
+            const canvas = document.getElementById('rooflineCanvas');
+            const ctx = canvas.getContext('2d');
+            const slider = document.getElementById('intensitySlider');
+            const label = document.getElementById('intensityLabel');
+
+            const W = canvas.width, H = canvas.height;
+            const PAD = { left: 60, right: 30, top: 30, bottom: 50 };
+            const CW = W - PAD.left - PAD.right;
+            const CH = H - PAD.top - PAD.bottom;
+
+            // Log scale: x from 0.1 to 1000 FLOPs/byte, y from 0 to peak compute
+            const X_MIN = Math.log10(0.1), X_MAX = Math.log10(2000);
+            const Y_MIN = 0, Y_MAX = 1; // normalised
+
+            const H100_PEAK_FLOPS = 1979;  // TFLOP/s BF16
+            const H100_BW = 3.35;          // TB/s HBM
+            const RIDGE = H100_PEAK_FLOPS / H100_BW; // ~590 FLOPs/byte
+
+            function xPx(logX) { return PAD.left + (logX - X_MIN) / (X_MAX - X_MIN) * CW; }
+            function yPx(normY) { return PAD.top + CH - normY * CH; }
+
+            // Named operations: [log10(intensity), description]
+            const OPS = [
+                { logI: Math.log10(1.5), label: 'Attention\n(autoregressive)', color: '#4299e1' },
+                { logI: Math.log10(10), label: 'Layer Norm', color: '#ed8936' },
+                { logI: Math.log10(60), label: 'GEMM\n(large batch)', color: '#68d391' },
+                { logI: Math.log10(200), label: 'Convolution\n(image)', color: '#9f7aea' },
+            ];
+
+            function draw(sliderVal) {
+                ctx.clearRect(0, 0, W, H);
+                ctx.fillStyle = '#f7fafc';
+                ctx.fillRect(0, 0, W, H);
+
+                // ---- axes ----
+                ctx.strokeStyle = '#a0aec0';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(PAD.left, PAD.top); ctx.lineTo(PAD.left, PAD.top + CH);
+                ctx.lineTo(PAD.left + CW, PAD.top + CH);
+                ctx.stroke();
+
+                // x axis ticks and labels
+                ctx.font = '10px monospace';
+                ctx.fillStyle = '#718096';
+                ctx.textAlign = 'center';
+                [0.1, 1, 10, 100, 1000].forEach(v => {
+                    const x = xPx(Math.log10(v));
+                    ctx.beginPath();
+                    ctx.moveTo(x, PAD.top + CH);
+                    ctx.lineTo(x, PAD.top + CH + 4);
+                    ctx.stroke();
+                    ctx.fillText(v < 1 ? v.toFixed(1) : v, x, PAD.top + CH + 16);
+                });
+                ctx.fillStyle = '#4a5568';
+                ctx.font = '11px sans-serif';
+                ctx.fillText('Arithmetic Intensity (FLOPs / byte)', PAD.left + CW / 2, H - 6);
+
+                // y axis ticks
+                ctx.textAlign = 'right';
+                ctx.font = '10px monospace';
+                ctx.fillStyle = '#718096';
+                [0, 0.25, 0.5, 0.75, 1.0].forEach(v => {
+                    const y = yPx(v);
+                    ctx.beginPath();
+                    ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left - 4, y);
+                    ctx.stroke();
+                    if (v === 1.0) {
+                        ctx.fillText('peak', PAD.left - 6, y + 4);
+                    } else {
+                        ctx.fillText(`${(v * 100).toFixed(0)}%`, PAD.left - 6, y + 4);
+                    }
+                });
+                ctx.save();
+                ctx.translate(14, PAD.top + CH / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.font = '11px sans-serif';
+                ctx.fillStyle = '#4a5568';
+                ctx.textAlign = 'center';
+                ctx.fillText('Performance (% of peak FLOP/s)', 0, 0);
+                ctx.restore();
+
+                // ---- memory bound region (shaded) ----
+                const ridgeX = xPx(Math.log10(RIDGE));
+                ctx.fillStyle = 'rgba(214, 158, 46, 0.07)';
+                ctx.fillRect(PAD.left, PAD.top, ridgeX - PAD.left, CH);
+
+                // ---- memory slope line ----
+                ctx.strokeStyle = '#d69e2e';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(PAD.left, yPx(0));
+                ctx.lineTo(ridgeX, yPx(1.0));
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // ---- compute roof ----
+                ctx.strokeStyle = '#e53e3e';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(ridgeX, yPx(1.0));
+                ctx.lineTo(PAD.left + CW, yPx(1.0));
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Roof labels
+                ctx.font = '11px monospace';
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#e53e3e';
+                ctx.fillText('Compute limit', ridgeX + 8, yPx(1.0) - 6);
+                ctx.fillStyle = '#d69e2e';
+                ctx.textAlign = 'center';
+                ctx.fillText('Memory BW slope', PAD.left + (ridgeX - PAD.left) / 2 - 15, yPx(0.55));
+
+                // Ridge point
+                ctx.fillStyle = '#805ad5';
+                ctx.beginPath();
+                ctx.arc(ridgeX, yPx(1.0), 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#805ad5';
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('ridge', ridgeX, yPx(1.0) - 12);
+
+                // ---- named operation markers ----
+                OPS.forEach(op => {
+                    const xi = op.logI;
+                    // roofline performance at this intensity
+                    const perfNorm = Math.min(1.0, (Math.pow(10, xi) / RIDGE));
+                    const opX = xPx(xi);
+                    const opY = yPx(perfNorm);
+                    ctx.fillStyle = op.color;
+                    ctx.beginPath();
+                    ctx.arc(opX, opY, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    // label
+                    const lines = op.label.split('\n');
+                    ctx.font = '10px monospace';
+                    ctx.textAlign = 'center';
+                    lines.forEach((l, i) => {
+                        ctx.fillText(l, opX, opY - 16 + i * 12);
+                    });
+                    // vertical dashed line from point to x-axis
+                    ctx.strokeStyle = op.color;
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 3]);
+                    ctx.globalAlpha = 0.4;
+                    ctx.beginPath();
+                    ctx.moveTo(opX, opY);
+                    ctx.lineTo(opX, PAD.top + CH);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.globalAlpha = 1;
+                });
+
+                // ---- slider-driven highlight ----
+                const userIntensity = Math.pow(10, X_MIN + (sliderVal / 100) * (X_MAX - X_MIN));
+                const userPerfNorm = Math.min(1.0, userIntensity / RIDGE);
+                const ux = xPx(Math.log10(userIntensity));
+                const uy = yPx(userPerfNorm);
+
+                ctx.fillStyle = '#2d3748';
+                ctx.strokeStyle = '#2d3748';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(ux, uy, 8, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(ux, uy, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                const utilPct = (userPerfNorm * 100).toFixed(1);
+                const regime = userIntensity < RIDGE ? '⚠ memory-bound' : '✓ compute-bound';
+                const regColor = userIntensity < RIDGE ? '#d69e2e' : '#38a169';
+                label.innerHTML = `Arithmetic intensity: <strong>${userIntensity < 10 ? userIntensity.toFixed(2) : Math.round(userIntensity)}</strong> FLOPs/byte &nbsp;|&nbsp; HW utilisation: <strong>${utilPct}%</strong> &nbsp;|&nbsp; <span style="color:${regColor}">${regime}</span>`;
+            }
+
+            slider.addEventListener('input', () => draw(+slider.value));
+            draw(+slider.value);
+        })();
+
+        // =====================================================================
+        // 2. Bar chart: TurboQuant results
+        // =====================================================================
+        (function () {
+            const canvas = document.getElementById('barChart');
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width, H = canvas.height;
+
+            const data = [
+                {
+                    group: 'Attention Speedup (H100, 4-bit)', bars: [
+                        { label: 'FP32 baseline', val: 1.0, color: '#cbd5e0' },
+                        { label: 'KIVI 4-bit', val: 3.2, color: '#63b3ed' },
+                        { label: 'TurboQuant 4-bit', val: 8.0, color: '#4299e1' },
+                    ]
+                },
+                {
+                    group: 'KV Cache Memory Reduction (×)', bars: [
+                        { label: 'FP16 baseline', val: 1.0, color: '#cbd5e0' },
+                        { label: 'KIVI 2-bit', val: 4.2, color: '#68d391' },
+                        { label: 'TurboQuant 3.5-bit', val: 6.0, color: '#38a169' },
+                    ]
+                },
+            ];
+
+            const maxVal = 8;
+            const groupW = W / data.length;
+            const barPad = 20;
+            const chartTop = 45;
+            const chartH = H - chartTop - 50;
+
+            ctx.clearRect(0, 0, W, H);
+            ctx.fillStyle = '#f7fafc';
+            ctx.fillRect(0, 0, W, H);
+
+            data.forEach((group, gi) => {
+                const gx = gi * groupW + barPad;
+                const availW = groupW - 2 * barPad;
+                const barW = (availW - (group.bars.length - 1) * 6) / group.bars.length;
+
+                // Group label
+                ctx.font = 'bold 11px sans-serif';
+                ctx.fillStyle = '#2d3748';
+                ctx.textAlign = 'center';
+                // Wrap long label
+                const words = group.group.split(' ');
+                let line = '';
+                let lineY = 16;
+                const maxW = groupW - 10;
+                words.forEach(word => {
+                    const test = line + (line ? ' ' : '') + word;
+                    if (ctx.measureText(test).width > maxW && line) {
+                        ctx.fillText(line, gx + availW / 2, lineY);
+                        line = word;
+                        lineY += 14;
+                    } else {
+                        line = test;
+                    }
+                });
+                ctx.fillText(line, gx + availW / 2, lineY);
+
+                group.bars.forEach((bar, bi) => {
+                    const bx = gx + bi * (barW + 6);
+                    const bh = (bar.val / maxVal) * chartH;
+                    const by = chartTop + chartH - bh;
+
+                    ctx.fillStyle = bar.color;
+                    ctx.beginPath();
+                    ctx.roundRect(bx, by, barW, bh, [3, 3, 0, 0]);
+                    ctx.fill();
+
+                    // Value label on bar
+                    ctx.font = 'bold 12px monospace';
+                    ctx.fillStyle = '#2d3748';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(bar.val + '×', bx + barW / 2, by - 5);
+
+                    // Bar label below
+                    ctx.font = '9px sans-serif';
+                    ctx.fillStyle = '#718096';
+                    const labelLines = bar.label.split(' ');
+                    let lx = bx + barW / 2;
+                    let ly = chartTop + chartH + 14;
+                    labelLines.forEach((w, wi) => {
+                        if (wi === 1) ly += 10;
+                        if (wi === 0) ctx.fillText(w, lx, ly);
+                        else ctx.fillText(w, lx, ly);
+                    });
+                    // Just abbreviate
+                    ctx.fillText(bar.label.split(' ').slice(0, 2).join(' '), lx, chartTop + chartH + 14);
+                });
+
+                // Divider
+                if (gi < data.length - 1) {
+                    ctx.strokeStyle = '#e2e8f0';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(groupW, chartTop);
+                    ctx.lineTo(groupW, chartTop + chartH + 30);
+                    ctx.stroke();
+                }
+            });
+
+            // Y axis guideline
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            [2, 4, 6, 8].forEach(v => {
+                const y = chartTop + chartH - (v / maxVal) * chartH;
+                ctx.beginPath();
+                ctx.moveTo(0, y); ctx.lineTo(W, y);
+                ctx.stroke();
+                ctx.font = '9px monospace';
+                ctx.fillStyle = '#a0aec0';
+                ctx.textAlign = 'left';
+                ctx.fillText(v + '×', 2, y - 2);
+            });
+        })();
+
+        // =====================================================================
+        // 3. Roofline comparison: hardware vs algorithm approach
+        // =====================================================================
+        (function () {
+            const canvas = document.getElementById('rooflineCompare');
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width, H = canvas.height;
+            const PAD = { left: 55, right: 20, top: 30, bottom: 40 };
+            const CW = W - PAD.left - PAD.right;
+            const CH = H - PAD.top - PAD.bottom;
+
+            const X_MIN = Math.log10(0.2), X_MAX = Math.log10(800);
+            // Normalised y
+
+            function xPx(logX) { return PAD.left + (logX - X_MIN) / (X_MAX - X_MIN) * CW; }
+            function yPx(norm) { return PAD.top + CH - norm * CH; }
+
+            // Two systems: standard GPU (ridge at 590) and high-BW chip (ridge at ~45)
+            const SYS = [
+                { label: 'Standard GPU (H100, HBM)', ridge: 590, color: '#4299e1', dash: [] },
+                { label: 'High-BW Architecture (on-chip SRAM)', ridge: 45, color: '#ed8936', dash: [5, 3] },
+            ];
+
+            ctx.clearRect(0, 0, W, H);
+            ctx.fillStyle = '#f7fafc';
+            ctx.fillRect(0, 0, W, H);
+
+            // Axes
+            ctx.strokeStyle = '#a0aec0'; ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(PAD.left, PAD.top); ctx.lineTo(PAD.left, PAD.top + CH);
+            ctx.lineTo(PAD.left + CW, PAD.top + CH);
+            ctx.stroke();
+
+            // x ticks
+            ctx.font = '10px monospace'; ctx.fillStyle = '#718096'; ctx.textAlign = 'center';
+            [0.2, 1, 10, 100].forEach(v => {
+                const x = xPx(Math.log10(v));
+                ctx.beginPath(); ctx.moveTo(x, PAD.top + CH); ctx.lineTo(x, PAD.top + CH + 4); ctx.stroke();
+                ctx.fillText(v, x, PAD.top + CH + 16);
+            });
+            ctx.font = '11px sans-serif'; ctx.fillStyle = '#4a5568';
+            ctx.fillText('Arithmetic Intensity (FLOPs/byte)', PAD.left + CW / 2, H - 5);
+
+            // Draw rooflines
+            SYS.forEach(sys => {
+                const ridgeX = xPx(Math.log10(sys.ridge));
+                ctx.strokeStyle = sys.color;
+                ctx.lineWidth = 2;
+                ctx.setLineDash(sys.dash);
+                // slope
+                ctx.beginPath();
+                ctx.moveTo(PAD.left, yPx(0)); ctx.lineTo(ridgeX, yPx(1)); ctx.stroke();
+                // roof
+                ctx.beginPath();
+                ctx.moveTo(ridgeX, yPx(1)); ctx.lineTo(PAD.left + CW, yPx(1)); ctx.stroke();
+                ctx.setLineDash([]);
+                // ridge dot
+                ctx.fillStyle = sys.color;
+                ctx.beginPath(); ctx.arc(ridgeX, yPx(1), 4, 0, Math.PI * 2); ctx.fill();
+                // label
+                ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+                ctx.fillText(sys.label, ridgeX + 8, yPx(1) + 4);
+            });
+
+            // The workload dot: attention at ~2 FLOPs/byte
+            const attLogI = Math.log10(2);
+            const gpuPerf = Math.min(1, Math.pow(10, attLogI) / SYS[0].ridge);
+            const hwPerf = Math.min(1, Math.pow(10, attLogI) / SYS[1].ridge);
+            const attX = xPx(attLogI);
+
+            ctx.fillStyle = '#e53e3e';
+            ctx.beginPath(); ctx.arc(attX, yPx(gpuPerf), 7, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#e53e3e'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('Attention', attX, yPx(gpuPerf) - 10);
+            ctx.fillText('(FP16)', attX, yPx(gpuPerf) - 0);
+
+            // Arrow: hardware approach — same workload, different roof slope → higher on HBW line
+            ctx.strokeStyle = '#ed8936'; ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 2]);
+            ctx.beginPath();
+            ctx.moveTo(attX, yPx(gpuPerf));
+            ctx.lineTo(attX, yPx(hwPerf));
+            ctx.stroke(); ctx.setLineDash([]);
+            const arrowY = yPx(hwPerf);
+            ctx.fillStyle = '#ed8936';
+            ctx.beginPath();
+            ctx.moveTo(attX, arrowY); ctx.lineTo(attX - 5, arrowY + 10); ctx.lineTo(attX + 5, arrowY + 10);
+            ctx.closePath(); ctx.fill();
+            ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText('↑ Hardware raises', attX + 10, arrowY + 5);
+            ctx.fillText('  bandwidth ceiling', attX + 10, arrowY + 17);
+
+            // Arrow: algorithm approach — higher arithmetic intensity, same roof
+            const quantLogI = Math.log10(8); // 4× compression shifts intensity right
+            const quantX = xPx(quantLogI);
+            const quantPerf = Math.min(1, Math.pow(10, quantLogI) / SYS[0].ridge);
+            ctx.strokeStyle = '#805ad5'; ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 2]);
+            ctx.beginPath();
+            ctx.moveTo(attX, yPx(gpuPerf)); ctx.lineTo(quantX, yPx(quantPerf)); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#805ad5';
+            ctx.beginPath();
+            ctx.arc(quantX, yPx(quantPerf), 7, 0, Math.PI * 2); ctx.fill();
+            ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('→ Algorithm increases', quantX, yPx(quantPerf) - 22);
+            ctx.fillText('  arith. intensity', quantX, yPx(quantPerf) - 10);
+            ctx.fillText('  (quantize 4×)', quantX, yPx(quantPerf));
+
+            // Legend
+            ctx.font = '10px monospace'; ctx.textAlign = 'left';
+            ctx.fillStyle = '#ed8936'; ctx.fillText('─── high-BW hardware', PAD.left + 4, PAD.top + 12);
+            ctx.fillStyle = '#4299e1'; ctx.fillText('─ ─ standard GPU', PAD.left + 4, PAD.top + 26);
+        })();
+    </script>
+</body>
+
+</html>

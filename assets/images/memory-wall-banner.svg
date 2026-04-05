@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a202c"/>
+      <stop offset="100%" style="stop-color:#2d3748"/>
+    </linearGradient>
+    <linearGradient id="roofGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e53e3e"/>
+      <stop offset="100%" style="stop-color:#fc8181"/>
+    </linearGradient>
+    <linearGradient id="memGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d69e2e"/>
+      <stop offset="100%" style="stop-color:#f6e05e"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="400" fill="url(#bgGrad)"/>
+
+  <!-- Roofline chart axes -->
+  <line x1="80" y1="330" x2="520" y2="330" stroke="#4a5568" stroke-width="2"/>
+  <line x1="80" y1="330" x2="80" y2="60" stroke="#4a5568" stroke-width="2"/>
+
+  <!-- Axis labels -->
+  <text x="300" y="370" text-anchor="middle" font-family="monospace" font-size="12" fill="#a0aec0">Arithmetic Intensity (FLOPs / Byte)</text>
+  <text x="30" y="200" text-anchor="middle" font-family="monospace" font-size="11" fill="#a0aec0" transform="rotate(-90 30 200)">Performance (FLOP/s)</text>
+
+  <!-- Memory-bound slope region (shaded) -->
+  <polygon points="80,330 280,130 280,330" fill="#d69e2e" opacity="0.12"/>
+
+  <!-- Memory bandwidth slope line -->
+  <line x1="80" y1="330" x2="290" y2="120" stroke="url(#memGrad)" stroke-width="2.5" stroke-dasharray="6,3"/>
+  <text x="120" y="240" font-family="monospace" font-size="11" fill="#f6e05e" transform="rotate(-42 120 240)">Memory BW limit</text>
+
+  <!-- Compute roof line -->
+  <line x1="285" y1="120" x2="520" y2="120" stroke="url(#roofGrad)" stroke-width="2.5" stroke-dasharray="6,3"/>
+  <text x="380" y="108" text-anchor="middle" font-family="monospace" font-size="11" fill="#fc8181">Compute limit (peak FLOP/s)</text>
+
+  <!-- "Ridge point" marker -->
+  <circle cx="285" cy="120" r="6" fill="#805ad5"/>
+  <text x="297" y="115" font-family="monospace" font-size="10" fill="#b794f4">ridge point</text>
+
+  <!-- Attention marker (deep in memory-bound region) -->
+  <circle cx="140" cy="288" r="7" fill="#4299e1"/>
+  <text x="148" y="284" font-family="monospace" font-size="11" fill="#90cdf4">Attention</text>
+  <text x="148" y="298" font-family="monospace" font-size="10" fill="#63b3ed">(memory-bound)</text>
+
+  <!-- GEMM marker (near ridge) -->
+  <circle cx="255" cy="146" r="7" fill="#68d391"/>
+  <text x="263" y="142" font-family="monospace" font-size="11" fill="#9ae6b4">GEMM</text>
+  <text x="263" y="155" font-family="monospace" font-size="10" fill="#68d391">(near optimal)</text>
+
+  <!-- Right side: two solution boxes -->
+  <!-- Hardware solution -->
+  <rect x="560" y="55" width="210" height="110" rx="6" fill="#2b4c7e" stroke="#4299e1" stroke-width="1.5"/>
+  <text x="665" y="80" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="bold" fill="#90cdf4">Hardware Approach</text>
+  <text x="575" y="100" font-family="monospace" font-size="10" fill="#a0aec0">▸ More on-chip SRAM</text>
+  <text x="575" y="116" font-family="monospace" font-size="10" fill="#a0aec0">▸ MIMD parallelism</text>
+  <text x="575" y="132" font-family="monospace" font-size="10" fill="#a0aec0">▸ Move the roof up</text>
+  <text x="575" y="148" font-family="monospace" font-size="10" fill="#4299e1">→ raise bandwidth ceiling</text>
+
+  <!-- Algorithm solution -->
+  <rect x="560" y="195" width="210" height="110" rx="6" fill="#44337a" stroke="#805ad5" stroke-width="1.5"/>
+  <text x="665" y="220" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="bold" fill="#b794f4">Algorithm Approach</text>
+  <text x="575" y="240" font-family="monospace" font-size="10" fill="#a0aec0">▸ Quantize KV cache</text>
+  <text x="575" y="256" font-family="monospace" font-size="10" fill="#a0aec0">▸ Reduce data volume</text>
+  <text x="575" y="272" font-family="monospace" font-size="10" fill="#a0aec0">▸ Shift the workload</text>
+  <text x="575" y="288" font-family="monospace" font-size="10" fill="#805ad5">→ increase arith. intensity</text>
+
+  <!-- Arrow between the two philosophies -->
+  <text x="665" y="178" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#718096">two philosophies</text>
+  <line x1="665" y1="165" x2="665" y2="192" stroke="#718096" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Title -->
+  <text x="80" y="395" font-family="sans-serif" font-size="12" fill="#4a5568">Roofline Model — most LLM inference is deep in the memory-bound region</text>
+</svg>
