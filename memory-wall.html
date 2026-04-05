@@ -39,32 +39,24 @@
         </p>
 
         <p>
-            That single number tells you which of two limits you'll hit first.
-        </p>
-
-        <div class="animation-container">
-            <canvas id="rooflineCanvas" width="580" height="320"
-                style="border: 1px solid #e2e8f0; border-radius: 8px; display: block; margin: 0 auto; background: #f7fafc;"></canvas>
-            <p class="caption">The Roofline Model. Drag the slider to see where different AI operations sit — and why
-                attention is almost always memory-bound.</p>
-            <div style="text-align: center; margin-top: 10px;">
-                <input type="range" id="intensitySlider" min="0" max="100" value="20"
-                    style="width: 60%; accent-color: #4299e1;">
-                <div id="intensityLabel"
-                    style="font-family: monospace; font-size: 13px; color: #4a5568; margin-top: 4px;"></div>
-            </div>
-        </div>
-
-        <p>
-            Every chip has two hard limits: peak compute (FLOP/s) and peak memory bandwidth (bytes/s). Their
-            ratio gives you the <em>ridge point</em> — the minimum arithmetic intensity at which the chip is
-            actually compute-limited rather than waiting on memory. Below the ridge, you're memory-bound;
-            your compute units are mostly idle.
+            That single number tells you which of two limits you'll hit first. Every chip has two hard ceilings:
+            peak compute (FLOP/s) and peak memory bandwidth (bytes/s). If your arithmetic intensity is high —
+            lots of operations per byte — you're compute-bound and the chip is working flat out. If it's low,
+            you're memory-bound: the compute units are mostly idle, waiting for the next chunk of data to arrive.
+            The crossover point between the two regimes is called the <em>ridge point</em>.
         </p>
 
         <p>
             For an H100 SXM: ~1,979 TFLOP/s BF16 compute, ~3.35 TB/s HBM bandwidth.
-            Ridge point: roughly <strong>590 FLOPs/byte</strong>. That's a high bar to clear.
+            Ridge point: roughly <strong>590 FLOPs/byte</strong>. To be compute-limited, you need to perform
+            590 floating-point operations for every single byte you read from memory. That's a high bar.
+        </p>
+
+        <p>
+            A large matrix multiply (GEMM) with a big batch gets close — you reuse each weight many times
+            across the batch, so arithmetic intensity is high. But token generation in an LLM? You're producing
+            one token at a time, which means loading all the weights and KV-cache entries once each to do a
+            relatively small amount of arithmetic. Arithmetic intensity collapses.
         </p>
 
         <div class="highlight-box">
@@ -284,15 +276,8 @@
 
         <p>
             What I find interesting is that the hardware approach and the algorithmic approach are actually attacking
-            the same constraint from opposite ends, and the roofline model makes that relationship precise.
+            the same constraint from opposite ends — you can see this clearly in terms of the roofline model.
         </p>
-
-        <div class="animation-container">
-            <canvas id="rooflineCompare" width="560" height="260"
-                style="border: 1px solid #e2e8f0; border-radius: 8px; display: block; margin: 0 auto; background: #f7fafc;"></canvas>
-            <p class="caption">Both strategies move a workload out of the memory-bound region — but by moving different
-                axes.</p>
-        </div>
 
         <ul>
             <li><strong>Hardware approach:</strong> raise the bandwidth ceiling so the ridge point shifts
@@ -378,195 +363,7 @@
 
     <script>
         // =====================================================================
-        // 1. Interactive Roofline chart
-        // =====================================================================
-        (function () {
-            const canvas = document.getElementById('rooflineCanvas');
-            const ctx = canvas.getContext('2d');
-            const slider = document.getElementById('intensitySlider');
-            const label = document.getElementById('intensityLabel');
-
-            const W = canvas.width, H = canvas.height;
-            const PAD = { left: 60, right: 30, top: 30, bottom: 50 };
-            const CW = W - PAD.left - PAD.right;
-            const CH = H - PAD.top - PAD.bottom;
-
-            // Log scale: x from 0.1 to 1000 FLOPs/byte, y from 0 to peak compute
-            const X_MIN = Math.log10(0.1), X_MAX = Math.log10(2000);
-            const Y_MIN = 0, Y_MAX = 1; // normalised
-
-            const H100_PEAK_FLOPS = 1979;  // TFLOP/s BF16
-            const H100_BW = 3.35;          // TB/s HBM
-            const RIDGE = H100_PEAK_FLOPS / H100_BW; // ~590 FLOPs/byte
-
-            function xPx(logX) { return PAD.left + (logX - X_MIN) / (X_MAX - X_MIN) * CW; }
-            function yPx(normY) { return PAD.top + CH - normY * CH; }
-
-            // Named operations: [log10(intensity), description]
-            const OPS = [
-                { logI: Math.log10(1.5), label: 'Attention\n(autoregressive)', color: '#4299e1' },
-                { logI: Math.log10(10), label: 'Layer Norm', color: '#ed8936' },
-                { logI: Math.log10(60), label: 'GEMM\n(large batch)', color: '#68d391' },
-                { logI: Math.log10(200), label: 'Convolution\n(image)', color: '#9f7aea' },
-            ];
-
-            function draw(sliderVal) {
-                ctx.clearRect(0, 0, W, H);
-                ctx.fillStyle = '#f7fafc';
-                ctx.fillRect(0, 0, W, H);
-
-                // ---- axes ----
-                ctx.strokeStyle = '#a0aec0';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(PAD.left, PAD.top); ctx.lineTo(PAD.left, PAD.top + CH);
-                ctx.lineTo(PAD.left + CW, PAD.top + CH);
-                ctx.stroke();
-
-                // x axis ticks and labels
-                ctx.font = '10px monospace';
-                ctx.fillStyle = '#718096';
-                ctx.textAlign = 'center';
-                [0.1, 1, 10, 100, 1000].forEach(v => {
-                    const x = xPx(Math.log10(v));
-                    ctx.beginPath();
-                    ctx.moveTo(x, PAD.top + CH);
-                    ctx.lineTo(x, PAD.top + CH + 4);
-                    ctx.stroke();
-                    ctx.fillText(v < 1 ? v.toFixed(1) : v, x, PAD.top + CH + 16);
-                });
-                ctx.fillStyle = '#4a5568';
-                ctx.font = '11px sans-serif';
-                ctx.fillText('Arithmetic Intensity (FLOPs / byte)', PAD.left + CW / 2, H - 6);
-
-                // y axis ticks
-                ctx.textAlign = 'right';
-                ctx.font = '10px monospace';
-                ctx.fillStyle = '#718096';
-                [0, 0.25, 0.5, 0.75, 1.0].forEach(v => {
-                    const y = yPx(v);
-                    ctx.beginPath();
-                    ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left - 4, y);
-                    ctx.stroke();
-                    if (v === 1.0) {
-                        ctx.fillText('peak', PAD.left - 6, y + 4);
-                    } else {
-                        ctx.fillText(`${(v * 100).toFixed(0)}%`, PAD.left - 6, y + 4);
-                    }
-                });
-                ctx.save();
-                ctx.translate(14, PAD.top + CH / 2);
-                ctx.rotate(-Math.PI / 2);
-                ctx.font = '11px sans-serif';
-                ctx.fillStyle = '#4a5568';
-                ctx.textAlign = 'center';
-                ctx.fillText('Performance (% of peak FLOP/s)', 0, 0);
-                ctx.restore();
-
-                // ---- memory bound region (shaded) ----
-                const ridgeX = xPx(Math.log10(RIDGE));
-                ctx.fillStyle = 'rgba(214, 158, 46, 0.07)';
-                ctx.fillRect(PAD.left, PAD.top, ridgeX - PAD.left, CH);
-
-                // ---- memory slope line ----
-                ctx.strokeStyle = '#d69e2e';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([6, 4]);
-                ctx.beginPath();
-                ctx.moveTo(PAD.left, yPx(0));
-                ctx.lineTo(ridgeX, yPx(1.0));
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // ---- compute roof ----
-                ctx.strokeStyle = '#e53e3e';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([6, 4]);
-                ctx.beginPath();
-                ctx.moveTo(ridgeX, yPx(1.0));
-                ctx.lineTo(PAD.left + CW, yPx(1.0));
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // Roof labels
-                ctx.font = '11px monospace';
-                ctx.textAlign = 'left';
-                ctx.fillStyle = '#e53e3e';
-                ctx.fillText('Compute limit', ridgeX + 8, yPx(1.0) - 6);
-                ctx.fillStyle = '#d69e2e';
-                ctx.textAlign = 'center';
-                ctx.fillText('Memory BW slope', PAD.left + (ridgeX - PAD.left) / 2 - 15, yPx(0.55));
-
-                // Ridge point
-                ctx.fillStyle = '#805ad5';
-                ctx.beginPath();
-                ctx.arc(ridgeX, yPx(1.0), 5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#805ad5';
-                ctx.font = '10px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText('ridge', ridgeX, yPx(1.0) - 12);
-
-                // ---- named operation markers ----
-                OPS.forEach(op => {
-                    const xi = op.logI;
-                    // roofline performance at this intensity
-                    const perfNorm = Math.min(1.0, (Math.pow(10, xi) / RIDGE));
-                    const opX = xPx(xi);
-                    const opY = yPx(perfNorm);
-                    ctx.fillStyle = op.color;
-                    ctx.beginPath();
-                    ctx.arc(opX, opY, 6, 0, Math.PI * 2);
-                    ctx.fill();
-                    // label
-                    const lines = op.label.split('\n');
-                    ctx.font = '10px monospace';
-                    ctx.textAlign = 'center';
-                    lines.forEach((l, i) => {
-                        ctx.fillText(l, opX, opY - 16 + i * 12);
-                    });
-                    // vertical dashed line from point to x-axis
-                    ctx.strokeStyle = op.color;
-                    ctx.lineWidth = 1;
-                    ctx.setLineDash([3, 3]);
-                    ctx.globalAlpha = 0.4;
-                    ctx.beginPath();
-                    ctx.moveTo(opX, opY);
-                    ctx.lineTo(opX, PAD.top + CH);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                    ctx.globalAlpha = 1;
-                });
-
-                // ---- slider-driven highlight ----
-                const userIntensity = Math.pow(10, X_MIN + (sliderVal / 100) * (X_MAX - X_MIN));
-                const userPerfNorm = Math.min(1.0, userIntensity / RIDGE);
-                const ux = xPx(Math.log10(userIntensity));
-                const uy = yPx(userPerfNorm);
-
-                ctx.fillStyle = '#2d3748';
-                ctx.strokeStyle = '#2d3748';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.arc(ux, uy, 8, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(ux, uy, 6, 0, Math.PI * 2);
-                ctx.fill();
-
-                const utilPct = (userPerfNorm * 100).toFixed(1);
-                const regime = userIntensity < RIDGE ? '⚠ memory-bound' : '✓ compute-bound';
-                const regColor = userIntensity < RIDGE ? '#d69e2e' : '#38a169';
-                label.innerHTML = `Arithmetic intensity: <strong>${userIntensity < 10 ? userIntensity.toFixed(2) : Math.round(userIntensity)}</strong> FLOPs/byte &nbsp;|&nbsp; HW utilisation: <strong>${utilPct}%</strong> &nbsp;|&nbsp; <span style="color:${regColor}">${regime}</span>`;
-            }
-
-            slider.addEventListener('input', () => draw(+slider.value));
-            draw(+slider.value);
-        })();
-
-        // =====================================================================
-        // 2. Bar chart: TurboQuant results
+        // Bar chart: TurboQuant results
         // =====================================================================
         (function () {
             const canvas = document.getElementById('barChart');
@@ -683,121 +480,6 @@
             });
         })();
 
-        // =====================================================================
-        // 3. Roofline comparison: hardware vs algorithm approach
-        // =====================================================================
-        (function () {
-            const canvas = document.getElementById('rooflineCompare');
-            const ctx = canvas.getContext('2d');
-            const W = canvas.width, H = canvas.height;
-            const PAD = { left: 55, right: 20, top: 30, bottom: 40 };
-            const CW = W - PAD.left - PAD.right;
-            const CH = H - PAD.top - PAD.bottom;
-
-            const X_MIN = Math.log10(0.2), X_MAX = Math.log10(800);
-            // Normalised y
-
-            function xPx(logX) { return PAD.left + (logX - X_MIN) / (X_MAX - X_MIN) * CW; }
-            function yPx(norm) { return PAD.top + CH - norm * CH; }
-
-            // Two systems: standard GPU (ridge at 590) and high-BW chip (ridge at ~45)
-            const SYS = [
-                { label: 'Standard GPU (H100, HBM)', ridge: 590, color: '#4299e1', dash: [] },
-                { label: 'High-BW Architecture (on-chip SRAM)', ridge: 45, color: '#ed8936', dash: [5, 3] },
-            ];
-
-            ctx.clearRect(0, 0, W, H);
-            ctx.fillStyle = '#f7fafc';
-            ctx.fillRect(0, 0, W, H);
-
-            // Axes
-            ctx.strokeStyle = '#a0aec0'; ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(PAD.left, PAD.top); ctx.lineTo(PAD.left, PAD.top + CH);
-            ctx.lineTo(PAD.left + CW, PAD.top + CH);
-            ctx.stroke();
-
-            // x ticks
-            ctx.font = '10px monospace'; ctx.fillStyle = '#718096'; ctx.textAlign = 'center';
-            [0.2, 1, 10, 100].forEach(v => {
-                const x = xPx(Math.log10(v));
-                ctx.beginPath(); ctx.moveTo(x, PAD.top + CH); ctx.lineTo(x, PAD.top + CH + 4); ctx.stroke();
-                ctx.fillText(v, x, PAD.top + CH + 16);
-            });
-            ctx.font = '11px sans-serif'; ctx.fillStyle = '#4a5568';
-            ctx.fillText('Arithmetic Intensity (FLOPs/byte)', PAD.left + CW / 2, H - 5);
-
-            // Draw rooflines
-            SYS.forEach(sys => {
-                const ridgeX = xPx(Math.log10(sys.ridge));
-                ctx.strokeStyle = sys.color;
-                ctx.lineWidth = 2;
-                ctx.setLineDash(sys.dash);
-                // slope
-                ctx.beginPath();
-                ctx.moveTo(PAD.left, yPx(0)); ctx.lineTo(ridgeX, yPx(1)); ctx.stroke();
-                // roof
-                ctx.beginPath();
-                ctx.moveTo(ridgeX, yPx(1)); ctx.lineTo(PAD.left + CW, yPx(1)); ctx.stroke();
-                ctx.setLineDash([]);
-                // ridge dot
-                ctx.fillStyle = sys.color;
-                ctx.beginPath(); ctx.arc(ridgeX, yPx(1), 4, 0, Math.PI * 2); ctx.fill();
-                // label
-                ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
-                ctx.fillText(sys.label, ridgeX + 8, yPx(1) + 4);
-            });
-
-            // The workload dot: attention at ~2 FLOPs/byte
-            const attLogI = Math.log10(2);
-            const gpuPerf = Math.min(1, Math.pow(10, attLogI) / SYS[0].ridge);
-            const hwPerf = Math.min(1, Math.pow(10, attLogI) / SYS[1].ridge);
-            const attX = xPx(attLogI);
-
-            ctx.fillStyle = '#e53e3e';
-            ctx.beginPath(); ctx.arc(attX, yPx(gpuPerf), 7, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#e53e3e'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
-            ctx.fillText('Attention', attX, yPx(gpuPerf) - 10);
-            ctx.fillText('(FP16)', attX, yPx(gpuPerf) - 0);
-
-            // Arrow: hardware approach — same workload, different roof slope → higher on HBW line
-            ctx.strokeStyle = '#ed8936'; ctx.lineWidth = 1.5;
-            ctx.setLineDash([3, 2]);
-            ctx.beginPath();
-            ctx.moveTo(attX, yPx(gpuPerf));
-            ctx.lineTo(attX, yPx(hwPerf));
-            ctx.stroke(); ctx.setLineDash([]);
-            const arrowY = yPx(hwPerf);
-            ctx.fillStyle = '#ed8936';
-            ctx.beginPath();
-            ctx.moveTo(attX, arrowY); ctx.lineTo(attX - 5, arrowY + 10); ctx.lineTo(attX + 5, arrowY + 10);
-            ctx.closePath(); ctx.fill();
-            ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
-            ctx.fillText('↑ Hardware raises', attX + 10, arrowY + 5);
-            ctx.fillText('  bandwidth ceiling', attX + 10, arrowY + 17);
-
-            // Arrow: algorithm approach — higher arithmetic intensity, same roof
-            const quantLogI = Math.log10(8); // 4× compression shifts intensity right
-            const quantX = xPx(quantLogI);
-            const quantPerf = Math.min(1, Math.pow(10, quantLogI) / SYS[0].ridge);
-            ctx.strokeStyle = '#805ad5'; ctx.lineWidth = 1.5;
-            ctx.setLineDash([3, 2]);
-            ctx.beginPath();
-            ctx.moveTo(attX, yPx(gpuPerf)); ctx.lineTo(quantX, yPx(quantPerf)); ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.fillStyle = '#805ad5';
-            ctx.beginPath();
-            ctx.arc(quantX, yPx(quantPerf), 7, 0, Math.PI * 2); ctx.fill();
-            ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText('→ Algorithm increases', quantX, yPx(quantPerf) - 22);
-            ctx.fillText('  arith. intensity', quantX, yPx(quantPerf) - 10);
-            ctx.fillText('  (quantize 4×)', quantX, yPx(quantPerf));
-
-            // Legend
-            ctx.font = '10px monospace'; ctx.textAlign = 'left';
-            ctx.fillStyle = '#ed8936'; ctx.fillText('─── high-BW hardware', PAD.left + 4, PAD.top + 12);
-            ctx.fillStyle = '#4299e1'; ctx.fillText('─ ─ standard GPU', PAD.left + 4, PAD.top + 26);
-        })();
     </script>
 </body>
 
