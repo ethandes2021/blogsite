@@ -161,81 +161,188 @@
 
         <p>
             I came across <strong>TurboQuant</strong> (Zandieh et al., Google Research, ICLR 2026) recently and
-            it's a good example of a paper where the core idea is simple enough to explain in a few sentences,
-            but the proof that it actually works is non-trivial. It tackles data-oblivious KV-cache compression
-            and comes with a formal guarantee that it's close to the theoretically best possible.
+            it's a great example of a paper where the core idea is simple enough to explain with an analogy,
+            but the proof that it actually works is genuinely non-trivial. The goal: shrink the KV cache as
+            aggressively as possible, without needing to peek at the data first, and with a formal proof that
+            you're close to the best anyone could ever do.
+        </p>
+
+        <h3>The Problem With Naive Compression</h3>
+
+        <p>
+            Think of a KV vector like a bar chart — a list of hundreds of numbers, each a different height.
+            To save memory you want to round each number to fewer decimal places (quantization). The naive approach:
+            pick a fixed set of "buckets" and map every number to its nearest bucket.
         </p>
 
         <p>
-            The core difficulty with data-oblivious quantization is this: for a \(d\)-dimensional vector \(x\),
-            you don't know ahead of time how the magnitudes are spread across coordinates. Some might be large,
-            some near zero — if you apply a simple uniform scalar quantizer to all coordinates identically,
-            you waste bits on the small ones and saturate on the large ones.
+            The problem is that different vectors have wildly different shapes. One vector might have a few huge
+            spikes and lots of near-zeros; another might be spread evenly. A fixed set of buckets that works
+            well for the first vector will waste precision — or miss values entirely — on the second.
+            Without looking at the data ahead of time, you don't know how to set the buckets.
+        </p>
+
+        <!-- Visual: the spike problem -->
+        <div style="background:#f7fafc; border:1px solid #e2e8f0; border-radius:10px; padding:20px 24px; margin:24px 0;">
+            <div style="font-size:12px; font-weight:700; color:#718096; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:12px;">Why naive quantization breaks</div>
+            <div style="display:flex; gap:32px; align-items:flex-end; flex-wrap:wrap;">
+                <div style="flex:1; min-width:200px;">
+                    <div style="font-size:12px; color:#4a5568; margin-bottom:8px; font-weight:600;">Original vector — spiky, uneven</div>
+                    <div style="display:flex; align-items:flex-end; gap:4px; height:70px;">
+                        <div style="width:18px; background:#4299e1; height:12px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#4299e1; height:60px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#4299e1; height:8px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#4299e1; height:45px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#4299e1; height:5px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#4299e1; height:70px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#4299e1; height:10px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#4299e1; height:30px; border-radius:2px 2px 0 0;"></div>
+                    </div>
+                    <div style="font-size:11px; color:#e53e3e; margin-top:8px;">⚠ Uniform buckets waste bits on the tiny values, clip the tall ones</div>
+                </div>
+                <div style="font-size:24px; color:#a0aec0; align-self:center;">→</div>
+                <div style="flex:1; min-width:200px;">
+                    <div style="font-size:12px; color:#4a5568; margin-bottom:8px; font-weight:600;">After rotation — smooth, predictable</div>
+                    <div style="display:flex; align-items:flex-end; gap:4px; height:70px;">
+                        <div style="width:18px; background:#68d391; height:30px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#68d391; height:38px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#68d391; height:42px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#68d391; height:45px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#68d391; height:43px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#68d391; height:36px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#68d391; height:29px; border-radius:2px 2px 0 0;"></div>
+                        <div style="width:18px; background:#68d391; height:20px; border-radius:2px 2px 0 0;"></div>
+                    </div>
+                    <div style="font-size:11px; color:#38a169; margin-top:8px;">✓ Now every coordinate looks similar — one set of buckets fits all</div>
+                </div>
+            </div>
+        </div>
+
+        <h3>Stage 1: Scramble, Then Compress</h3>
+
+        <p>
+            TurboQuant's first insight is elegant: before you quantize, <strong>randomly rotate the vector</strong>.
+            Mathematically, multiplying by a random orthogonal matrix mixes all the coordinates together —
+            think of it like shuffling a deck of cards and then spreading the energy evenly across every slot.
         </p>
 
         <p>
-            TurboQuant's fix: apply a <strong>random orthogonal rotation</strong> to the vector before
-            quantizing.
+            After rotation, something remarkable happens. No matter what the original vector looked like —
+            spiky, flat, concentrated, spread out — the rotated coordinates all end up following the
+            <em>same predictable statistical distribution</em> (a Beta distribution, if you want the detail).
+            The rotation erases the data-specific structure. You can now design one perfect set of
+            quantization buckets offline, and it'll work well for every input you ever see.
+            Google calls this a <strong>Lloyd-Max quantizer</strong> — it's mathematically optimal for that
+            known distribution.
         </p>
 
-        <div class="math-block">
-            <p>Let \( R \in \mathbb{R}^{d \times d} \) be a random orthogonal matrix. Transform: \( \tilde{x} = Rx \).
-            </p>
-            <p>By the rotational symmetry of the Gaussian measure, the coordinates of \( \tilde{x} \) are nearly
-                <strong>independent and identically distributed</strong> in high dimensions — each following a
-                Beta\((1/2, (d-1)/2)\) distribution.
-            </p>
+        <div class="highlight-box">
+            <strong>The key insight:</strong> You can't design a good compressor without knowing the data's shape.
+            So rotate the data into a shape you <em>already know</em>.
+        </div>
+
+        <h3>Stage 2: Fix the Bias</h3>
+
+        <p>
+            There's a catch. Attention doesn't care whether your reconstructed vectors are close in the
+            mean-squared-error sense — it cares about <strong>dot products</strong>. When query vector \(q\)
+            looks up key vector \(k\) to decide "how much attention to pay here?", it computes \(q \cdot k\).
+            Rounding errors in the compressed \(k\) introduce a systematic bias into this dot product, which
+            skews the attention scores and corrupts the output.
+        </p>
+
+        <!-- Visual: two-stage pipeline -->
+        <div style="background:#f7fafc; border:1px solid #e2e8f0; border-radius:10px; padding:20px 24px; margin:24px 0;">
+            <div style="font-size:12px; font-weight:700; color:#718096; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:16px;">TurboQuant's two-stage pipeline</div>
+            <div style="display:flex; align-items:center; gap:0; flex-wrap:wrap;">
+
+                <div style="text-align:center; padding:12px 16px; background:#ebf8ff; border:1.5px solid #90cdf4; border-radius:8px; min-width:120px; flex:1;">
+                    <div style="font-size:22px; margin-bottom:4px;">📦</div>
+                    <div style="font-size:12px; font-weight:700; color:#2b6cb0;">Input KV vector</div>
+                    <div style="font-size:11px; color:#4a5568; margin-top:4px;">16-bit float<br>e.g. 4096 dims</div>
+                </div>
+
+                <div style="padding:0 6px; color:#a0aec0; font-size:18px;">→</div>
+
+                <div style="text-align:center; padding:12px 16px; background:#f0fff4; border:1.5px solid #9ae6b4; border-radius:8px; min-width:120px; flex:1;">
+                    <div style="font-size:22px; margin-bottom:4px;">🔀</div>
+                    <div style="font-size:12px; font-weight:700; color:#276749;">Random Rotation</div>
+                    <div style="font-size:11px; color:#4a5568; margin-top:4px;">Scrambles coordinates<br>→ uniform shape</div>
+                </div>
+
+                <div style="padding:0 6px; color:#a0aec0; font-size:18px;">→</div>
+
+                <div style="text-align:center; padding:12px 16px; background:#fffaf0; border:1.5px solid #fbd38d; border-radius:8px; min-width:120px; flex:1;">
+                    <div style="font-size:22px; margin-bottom:4px;">🗜️</div>
+                    <div style="font-size:12px; font-weight:700; color:#7b341e;">Lloyd-Max Quant.</div>
+                    <div style="font-size:11px; color:#4a5568; margin-top:4px;">Optimal buckets<br>(b−1 bits)</div>
+                </div>
+
+                <div style="padding:0 6px; color:#a0aec0; font-size:18px;">→</div>
+
+                <div style="text-align:center; padding:12px 16px; background:#faf5ff; border:1.5px solid #d6bcfa; border-radius:8px; min-width:120px; flex:1;">
+                    <div style="font-size:22px; margin-bottom:4px;">🩹</div>
+                    <div style="font-size:12px; font-weight:700; color:#553c9a;">1-bit QJL Fix</div>
+                    <div style="font-size:11px; color:#4a5568; margin-top:4px;">Captures residual<br>→ unbiased dot products</div>
+                </div>
+
+                <div style="padding:0 6px; color:#a0aec0; font-size:18px;">→</div>
+
+                <div style="text-align:center; padding:12px 16px; background:#fff5f5; border:1.5px solid #fc8181; border-radius:8px; min-width:120px; flex:1;">
+                    <div style="font-size:22px; margin-bottom:4px;">💾</div>
+                    <div style="font-size:12px; font-weight:700; color:#9b2c2c;">Compressed KV</div>
+                    <div style="font-size:11px; color:#4a5568; margin-top:4px;">~3.5–4 bits total<br>6× smaller</div>
+                </div>
+
+            </div>
         </div>
 
         <p>
-            After rotation, the coordinates of \(\tilde{x} = Rx\) are nearly independent and identically
-            distributed in high dimensions — following a Beta\((1/2, (d{-}1)/2)\) distribution regardless of
-            what \(x\) originally was. That's the key: you now have a fixed, known distribution to design your
-            quantizer for. An <strong>optimal Lloyd-Max scalar quantizer</strong> can be computed once offline
-            for that distribution and reused for every single input vector. No per-vector calibration needed.
+            TurboQuant's second stage fixes this. After quantizing with \((b{-}1)\) bits, there's a small leftover
+            error — the difference between the original vector and its compressed version. Instead of discarding it,
+            TurboQuant stores a single extra bit: the <em>sign</em> of the dot product between that leftover error
+            and a random ±1 vector. One bit. Sounds useless, but mathematically that sign is an
+            <strong>unbiased estimator</strong> of the inner product of the error — meaning on average, it
+            corrects the bias perfectly. This is the <strong>Quantized Johnson-Lindenstrauss (QJL)</strong> trick.
         </p>
+
+        <h3>How Close to Perfect Is It?</h3>
 
         <p>
-            That gets you MSE-optimal compression. But attention doesn't care about MSE — it computes
-            <strong>inner products</strong> between queries and keys. Minimising reconstruction error and
-            minimising inner-product error aren't the same thing, and a naive quantizer introduces a
-            systematic bias into the dot products.
+            The paper includes a formal proof that the combined scheme is within <strong>2.7× of the
+            information-theoretic lower bound</strong> — the absolute best any data-oblivious algorithm could ever
+            achieve. Not 100× off. Not 10× off. Just 2.7×. That last gap isn't a failure of the method; it's
+            mathematically unavoidable without seeing the input distribution first. It's a result that hits
+            a ceiling and can <em>prove</em> it's close to the ceiling — something very few practical
+            compression papers can claim.
         </p>
 
-        <p>
-            TurboQuant handles this with a second stage. After the \((b{-}1)\)-bit MSE step, it takes the
-            residual error and applies a <strong>1-bit Quantized Johnson-Lindenstrauss (QJL) transform</strong>
-            — essentially projecting the residual onto a random sign vector and storing just the sign.
-            It sounds crude but the expectation of that product turns out to be an unbiased estimator of the
-            inner product of the residual.
-        </p>
-
-        <div class="math-block">
-            <p><strong>Stage 1 (MSE)</strong>: Apply \(b-1\) bits of Lloyd-Max scalar quantization after rotation.</p>
-            <p><strong>Stage 2 (IP bias correction)</strong>: For residual \( r = x - \hat{x} \), compute \( s =
-                \text{sign}(w^\top r) \) for random \( w \sim \{-1,+1\}^d \).</p>
-            <p>Combined estimator: \( \langle y, \hat{x} \rangle + s \cdot \langle y, w \rangle / \sqrt{d} \) is
-                <strong>unbiased</strong> for \( \langle y, x \rangle \).</p>
+        <div style="background:#f7fafc; border:1px solid #e2e8f0; border-radius:10px; padding:18px 24px; margin:24px 0;">
+            <div style="font-size:12px; font-weight:700; color:#718096; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:14px;">How TurboQuant compares</div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; color:#4a5568; margin-bottom:3px;">
+                        <span>Theoretical limit (Shannon lower bound)</span><span style="font-weight:700; color:#38a169;">1.0×</span>
+                    </div>
+                    <div style="height:10px; background:#c6f6d5; border-radius:4px; width:37%;"></div>
+                </div>
+                <div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; color:#4a5568; margin-bottom:3px;">
+                        <span><strong>TurboQuant</strong></span><span style="font-weight:700; color:#4299e1;">2.7× (proven near-optimal)</span>
+                    </div>
+                    <div style="height:10px; background:#bee3f8; border-radius:4px; width:100%;"></div>
+                </div>
+                <div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; color:#4a5568; margin-bottom:3px;">
+                        <span>Prior methods (KIVI, KVQuant, etc.)</span><span style="font-weight:700; color:#a0aec0;">no formal guarantee</span>
+                    </div>
+                    <div style="height:10px; background:#e2e8f0; border-radius:4px; width:100%; position:relative;">
+                        <div style="position:absolute; right:0; top:0; height:100%; background:repeating-linear-gradient(45deg, #cbd5e0, #cbd5e0 3px, #e2e8f0 3px, #e2e8f0 6px); border-radius:4px; width:100%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div style="font-size:11px; color:#718096; margin-top:10px;">Bar length represents compression quality — shorter is better (closer to theoretical limit)</div>
         </div>
-
-        <p>
-            The paper proves that the combined scheme achieves:
-        </p>
-
-        <ul>
-            <li><strong>MSE distortion</strong> \( \leq \frac{\sqrt{3}\pi}{2} \cdot \frac{1}{4^b} \), which sits
-                within a factor of \( \frac{3\pi}{2} \approx 2.7 \) of the information-theoretic lower bound
-                \( \frac{1}{4^b} \). No previous KV-cache method had any formal guarantee like this.</li>
-            <li><strong>Inner-product distortion</strong> \( \leq \frac{\sqrt{3}\pi^2 \|y\|_2^2}{d} \cdot \frac{1}{4^b}
-                \), also provably within a constant factor of optimal.</li>
-        </ul>
-
-        <p>
-            "Near-optimal" here means: no data-oblivious online algorithm can do significantly better, regardless
-            of how clever you get. That last factor of 2.7× is basically unavoidable without seeing the
-            input distribution first. It's a nice example of an engineering result hitting a theoretical ceiling
-            and being able to prove it.
-        </p>
 
         <h2>Does It Actually Help on Real Hardware?</h2>
 
