@@ -309,12 +309,38 @@
         <h3>How Close to Perfect Is It?</h3>
 
         <p>
-            The paper includes a formal proof that the combined scheme is within <strong>2.7× of the
-            information-theoretic lower bound</strong> — the absolute best any data-oblivious algorithm could ever
-            achieve. Not 100× off. Not 10× off. Just 2.7×. That last gap isn't a failure of the method; it's
-            mathematically unavoidable without seeing the input distribution first. It's a result that hits
-            a ceiling and can <em>prove</em> it's close to the ceiling — something very few practical
-            compression papers can claim.
+            This is the part I found most interesting. Most compression papers just benchmark against other
+            methods — "we beat KIVI by 12%." TurboQuant does something rarer: it benchmarks against
+            <em>the universe</em>.
+        </p>
+
+        <p>
+            Information theory sets a hard floor on compression. For any \(b\)-bit scheme, there is a
+            mathematical limit — derived from Shannon's theory — on how small the reconstruction error can
+            possibly be. It doesn't matter how clever your algorithm is, or how much compute you throw at it.
+            Below that floor, you simply cannot go. It's like asking how efficient a heat engine can be:
+            thermodynamics gives you a ceiling (Carnot efficiency), and no engineering trick can beat it.
+        </p>
+
+        <p>
+            The catch is that this theoretical limit assumes your algorithm can <em>see the data distribution
+            first</em> — it can study your vectors, learn their shape, and tune the compressor specifically
+            for them. TurboQuant is <strong>data-oblivious</strong>: it never looks at the data. It gets one
+            fixed rotation matrix and one fixed quantizer, and it must work for any input it encounters at
+            runtime.
+        </p>
+
+        <div class="highlight-box">
+            Despite being blind to the data, TurboQuant's error is within <strong>2.7× of what even an
+            all-knowing, data-aware compressor could achieve</strong>. The paper proves this with a formal
+            bound — not just a benchmark.
+        </div>
+
+        <p>
+            That 2.7× gap is not a bug. It's the fundamental cost of being online and data-oblivious, and
+            the paper proves it can't be closed without peeking at the distribution first. What makes this
+            remarkable is that TurboQuant can <em>prove</em> it's close to the ceiling — not just claim it.
+            Most compression methods never even attempt that comparison.
         </p>
 
         <div style="background:#f7fafc; border:1px solid #e2e8f0; border-radius:10px; padding:18px 24px; margin:24px 0;">
